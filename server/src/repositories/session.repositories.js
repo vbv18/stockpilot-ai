@@ -39,7 +39,8 @@ export async function getUserBySessionId(sessionId) {
 
   if (!rawUserData) return null;
 
-  const user = typeof rawUserData === "string" ? JSON.parse(rawUserData) : rawUserData;
+  const user =
+    typeof rawUserData === "string" ? JSON.parse(rawUserData) : rawUserData;
 
   return user || null;
 }
@@ -49,7 +50,10 @@ export async function getSessionByUserId(userId) {
 
   if (!rawSessionData) return null;
 
-  const sessionData = typeof rawSessionData === "string" ? JSON.parse(rawSessionData) : rawSessionData;
+  const sessionData =
+    typeof rawSessionData === "string"
+      ? JSON.parse(rawSessionData)
+      : rawSessionData;
 
   return sessionData?.sessionId || null;
 }
