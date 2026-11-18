@@ -1,0 +1,16 @@
+{
+  "name": "stockpilot-ai",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "format": "prettier --write ."
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "prettier": "^3.9.9"
+  }
+}
