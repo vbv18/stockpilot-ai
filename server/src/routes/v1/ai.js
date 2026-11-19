@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
+import { getUser } from "../../auth/currentUser.js";
 import { ACTION_ALLOWED_FROM } from "../../services/stateMachine.js";
 import { getEnv } from "../../config/env.js";
 import {
@@ -39,7 +40,8 @@ async function getEligibleSession(userId, sessionId) {
  */
 router.get("/sessions", async (req, res, next) => {
   try {
-    const userId = req.user.firebaseUid;
+    const user = getUser(res);
+    const userId = user.userId;
     const sessions = await AnalysisSessionModel.find({
       userId,
       archived: { $ne: true },
@@ -70,7 +72,8 @@ router.get("/sessions", async (req, res, next) => {
  */
 router.post("/sessions/:sessionId/reindex", async (req, res, next) => {
   try {
-    const userId = req.user.firebaseUid;
+    const user = getUser(res);
+    const userId = user.userId;
     const { sessionId } = req.params;
 
     const session = await getEligibleSession(userId, sessionId);
@@ -99,7 +102,8 @@ router.post("/sessions/:sessionId/reindex", async (req, res, next) => {
  */
 router.post("/conversations", async (req, res, next) => {
   try {
-    const userId = req.user.firebaseUid;
+    const user = getUser(res);
+    const userId = user.userId;
     const body = ConversationCreateBody.parse(req.body);
 
     const session = await getEligibleSession(userId, body.sessionId);
@@ -136,7 +140,8 @@ router.post("/conversations", async (req, res, next) => {
  */
 router.get("/conversations", async (req, res, next) => {
   try {
-    const userId = req.user.firebaseUid;
+    const user = getUser(res);
+    const userId = user.userId;
     const querySchema = PaginationQuery.extend({
       sessionId: ObjectIdString.optional(),
     });
@@ -179,7 +184,8 @@ router.get("/conversations", async (req, res, next) => {
  */
 router.get("/conversations/:conversationId", async (req, res, next) => {
   try {
-    const userId = req.user.firebaseUid;
+    const user = getUser(res);
+    const userId = user.userId;
     const { conversationId } = ConversationIdParam.parse(req.params);
 
     const conv = await AiConversationModel.findOne({ _id: conversationId, userId });
@@ -211,7 +217,8 @@ router.get("/conversations/:conversationId", async (req, res, next) => {
  */
 router.get("/conversations/:conversationId/messages", async (req, res, next) => {
   try {
-    const userId = req.user.firebaseUid;
+    const user = getUser(res);
+    const userId = user.userId;
     const { conversationId } = ConversationIdParam.parse(req.params);
     const { page, limit } = PaginationQuery.parse({
       ...req.query,
@@ -251,7 +258,8 @@ router.get("/conversations/:conversationId/messages", async (req, res, next) => 
  */
 router.post("/conversations/:conversationId/messages", async (req, res, next) => {
   const { conversationId } = ConversationIdParam.parse(req.params);
-  const userId = req.user.firebaseUid;
+  const user = getUser(res);
+  const userId = user.userId;
   const requestId = res.locals.requestId || "unknown";
 
   try {
