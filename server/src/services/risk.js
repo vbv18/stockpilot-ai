@@ -87,3 +87,28 @@ export function computeSkuRisk(input) {
   const score = flags.length;
   return { skuId: opt.sku_id, flags, score, level: score === 0 ? "low" : score === 1 ? "medium" : "high" };
 }
+
+export function buildSessionRisk(optRun, simRun = null, assumptions = null) {
+  if (!optRun || !optRun.result?.skus) return [];
+  const targetServiceLevel = assumptions?.values?.targetServiceLevel ?? 0.95;
+  const simSkus = simRun?.result?.skus || {};
+  const risks = [];
+
+  for (const [skuId, skuOpt] of Object.entries(optRun.result.skus)) {
+    const skuSim = simSkus[skuId] || null;
+    const r = computeSkuRisk({
+      opt: skuOpt,
+      evaluation: null,
+      simulation: skuSim,
+      targetServiceLevel,
+    });
+    risks.push({
+      ...r,
+      skuId,
+      stockoutUnitsDeterministic: skuSim?.deterministic?.mean_stockout_units ?? null,
+      stockoutUnitsUncertaintyAware: skuSim?.uncertainty_aware?.mean_stockout_units ?? null,
+    });
+  }
+  return risks;
+}
+

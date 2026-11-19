@@ -229,6 +229,83 @@ export const stockpilotApi = createApi({
       }),
       providesTags: (result, error, { simulationId }) => [{ type: "Simulation", id: simulationId }],
     }),
+
+    // AI endpoints
+    listAiSessions: builder.query({
+      query: () => ({
+        url: "/ai/sessions",
+        method: "GET",
+      }),
+      providesTags: ["AiSessions"],
+    }),
+
+    reindexSession: builder.mutation({
+      query: (sessionId) => ({
+        url: `/ai/sessions/${sessionId}/reindex`,
+        method: "POST",
+      }),
+      invalidatesTags: (result, error, sessionId) => [
+        "AiSessions",
+        { type: "Session", id: sessionId },
+      ],
+    }),
+
+    createConversation: builder.mutation({
+      query: (body) => ({
+        url: "/ai/conversations",
+        method: "POST",
+        body,
+      }),
+      invalidatesTags: ["Conversation"],
+    }),
+
+    listConversations: builder.query({
+      query: ({ sessionId, page = 1, limit = 20 } = {}) => ({
+        url: `/ai/conversations?${sessionId ? `sessionId=${sessionId}&` : ""}page=${page}&limit=${limit}`,
+        method: "GET",
+      }),
+      providesTags: ["Conversation"],
+    }),
+
+    getConversation: builder.query({
+      query: (id) => ({
+        url: `/ai/conversations/${id}`,
+        method: "GET",
+      }),
+      providesTags: (result, error, id) => [{ type: "Conversation", id }],
+    }),
+
+    listMessages: builder.query({
+      query: ({ id, page = 1, limit = 50 }) => ({
+        url: `/ai/conversations/${id}/messages?page=${page}&limit=${limit}`,
+        method: "GET",
+      }),
+      providesTags: (result, error, { id }) => [{ type: "Messages", id }],
+    }),
+
+    sendMessage: builder.mutation({
+      query: ({ id, content }) => ({
+        url: `/ai/conversations/${id}/messages`,
+        method: "POST",
+        body: { content },
+      }),
+      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+        try {
+          const { data } = await queryFulfilled;
+          if (data?.userMessage && data?.assistantMessage) {
+            dispatch(
+              stockpilotApi.util.updateQueryData("listMessages", { id, page: 1, limit: 50 }, (draft) => {
+                if (Array.isArray(draft)) {
+                  draft.push(data.userMessage, data.assistantMessage);
+                }
+              }),
+            );
+          }
+        } catch {
+          // On failure let RTK Query handle error
+        }
+      },
+    }),
   }),
 });
 
@@ -252,4 +329,11 @@ export const {
   useStartSimulationMutation,
   useListSimulationsQuery,
   useGetSimulationQuery,
+  useListAiSessionsQuery,
+  useReindexSessionMutation,
+  useCreateConversationMutation,
+  useListConversationsQuery,
+  useGetConversationQuery,
+  useListMessagesQuery,
+  useSendMessageMutation,
 } = stockpilotApi;

@@ -17,6 +17,7 @@ import forecastRouter from "./forecast.js";
 import assumptionsRouter from "./assumptions.js";
 import optimizationRouter from "./optimization.js";
 import simulationsRouter from "./simulations.js";
+import aiRouter from "./ai.js";
 
 const router = Router();
 
@@ -45,6 +46,7 @@ authenticatedRouter.use("/sessions/:sessionId/assumptions", assumptionsRouter);
 authenticatedRouter.use("/sessions/:sessionId/optimization", optimizationRouter);
 authenticatedRouter.use("/sessions/:sessionId/optimize", optimizationRouter);
 authenticatedRouter.use("/sessions/:sessionId/simulations", simulationsRouter);
+authenticatedRouter.use("/ai", aiRouter);
 
 router.use(authenticatedRouter);
 

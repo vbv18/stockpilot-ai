@@ -1,0 +1,243 @@
+import { buildSessionRisk } from "../risk.js";
+
+/**
+ * Builds compact session digest with raw numbers and no prose
+ */
+export function buildSessionDigest(bundle, risks = null) {
+  const { session, dataset, forecastRun, assumptions, optimizationRun, simulationRun } = bundle;
+
+  let computedRisks = risks;
+  if (!computedRisks && optimizationRun) {
+    try {
+      computedRisks = buildSessionRisk(optimizationRun, simulationRun, assumptions);
+    } catch {
+      computedRisks = [];
+    }
+  }
+  const riskMap = new Map((computedRisks || []).map((r) => [r.skuId, r]));
+
+  // Assumptions view
+  let assumptionsView = null;
+  if (assumptions && assumptions.values) {
+    const a = assumptions.values;
+    const hDay =
+      a.holdingCostUnit === "per_unit_per_year" ? a.holdingCost / 365 : a.holdingCost;
+    assumptionsView = {
+      version: assumptions.version ?? 1,
+      orderingCost: a.orderingCost,
+      holdingCost: a.holdingCost,
+      holdingCostUnit: a.holdingCostUnit || "per_unit_per_day",
+      holdingCostPerUnitPerDay: hDay,
+      shortagePenalty: a.shortagePenalty,
+      leadTimeDays: a.leadTimeDays,
+      targetServiceLevel: a.targetServiceLevel,
+    };
+  }
+
+  // SKU summaries
+  const skus = [];
+  const forecastSkus = forecastRun?.result?.skus || {};
+  const evalSkus = forecastRun?.result?.evaluation?.skus || {};
+  const optSkus = optimizationRun?.result?.skus || {};
+  const simSkus = simulationRun?.result?.skus || {};
+
+  const allSkuIds = new Set([
+    ...Object.keys(forecastSkus),
+    ...Object.keys(optSkus),
+    ...Object.keys(simSkus),
+  ]);
+
+  for (const skuId of [...allSkuIds].sort()) {
+    const fData = forecastSkus[skuId];
+    const eData = evalSkus[skuId];
+    const oData = optSkus[skuId];
+    const sData = simSkus[skuId];
+    const rData = riskMap.get(skuId);
+
+    const autoetsMean = fData?.autoets_mean || [];
+    const avgDailyForecast =
+      autoetsMean.length > 0 ? autoetsMean.reduce((a, b) => a + b, 0) / autoetsMean.length : null;
+
+    skus.push({
+      skuId,
+      forecastStatus: fData?.status || null,
+      intervalStatus: fData?.interval_status || null,
+      avgDailyForecast,
+      holdoutWapeAutoets: eData?.autoets?.wape ?? null,
+      holdoutCoverage: eData?.interval_metrics?.coverage_p10_p90 ?? null,
+      eoq: oData?.eoq ?? null,
+      ropDeterministic: oData?.rop_deterministic ?? null,
+      ropUncertaintyAware: oData?.rop_uncertainty_aware ?? null,
+      ropGap: oData?.rop_gap ?? null,
+      riskLevel: rData?.level || null,
+      simDetTotalCost: sData?.deterministic?.mean_total_cost ?? null,
+      simUncTotalCost: sData?.uncertainty_aware?.mean_total_cost ?? null,
+      simDetServiceLevel: sData?.deterministic?.service_level ?? null,
+      simUncServiceLevel: sData?.uncertainty_aware?.service_level ?? null,
+    });
+  }
+
+  return {
+    session: {
+      name: session.name,
+      status: session.status,
+    },
+    dataset: dataset?.validationSummary
+      ? {
+          skuIds: dataset.validationSummary.skuIds || [],
+          dateRange: dataset.validationSummary.dateRange || null,
+          rowCounts: {
+            accepted: dataset.validationSummary.acceptedRows,
+            total: dataset.validationSummary.totalRows,
+          },
+        }
+      : null,
+    assumptions: assumptionsView,
+    forecastAggregate: forecastRun?.result?.evaluation?.aggregate || null,
+    skus,
+    simulationAggregate: simulationRun?.result?.aggregate || null,
+  };
+}
+
+/**
+ * Maps a Qdrant hit back to its Mongo canonical record
+ */
+export function loadCanonicalForHit(bundle, hit) {
+  const { session, dataset, forecastRun, assumptions, optimizationRun, simulationRun } = bundle;
+  const { artifactType, artifactId, skuId } = hit;
+
+  switch (artifactType) {
+    case "session_overview": {
+      return {
+        artifactType: "session_digest",
+        artifactId: session._id.toString(),
+        skuId: null,
+        label: "Session overview digest",
+        payload: buildSessionDigest(bundle),
+      };
+    }
+
+    case "dataset_summary": {
+      if (!dataset?.validationSummary) return null;
+      return {
+        artifactType: "dataset",
+        artifactId: dataset._id.toString(),
+        skuId: null,
+        label: "Dataset summary",
+        payload: dataset.validationSummary,
+      };
+    }
+
+    case "forecast_aggregate": {
+      const agg = forecastRun?.result?.evaluation?.aggregate;
+      if (!agg) return null;
+      return {
+        artifactType: "evaluation",
+        artifactId: forecastRun._id.toString(),
+        skuId: null,
+        label: "Forecast evaluation aggregate",
+        payload: agg,
+      };
+    }
+
+    case "forecast_sku": {
+      const skuData = forecastRun?.result?.skus?.[skuId];
+      if (!skuData) return null;
+      // Exclude large residual_blocks
+      const { residual_blocks, ...rest } = skuData;
+      return {
+        artifactType: "forecast_run",
+        artifactId: forecastRun._id.toString(),
+        skuId,
+        label: `Forecast for SKU ${skuId}`,
+        payload: rest,
+      };
+    }
+
+    case "evaluation_sku": {
+      const evalData = forecastRun?.result?.evaluation?.skus?.[skuId];
+      if (!evalData) return null;
+      return {
+        artifactType: "evaluation",
+        artifactId: forecastRun._id.toString(),
+        skuId,
+        label: `Holdout evaluation for SKU ${skuId}`,
+        payload: evalData,
+      };
+    }
+
+    case "assumption_set": {
+      if (!assumptions?.values) return null;
+      const a = assumptions.values;
+      const hDay = a.holdingCostUnit === "per_unit_per_year" ? a.holdingCost / 365 : a.holdingCost;
+      return {
+        artifactType: "assumption_set",
+        artifactId: assumptions._id.toString(),
+        skuId: null,
+        label: `Assumptions version ${assumptions.version}`,
+        payload: {
+          version: assumptions.version ?? 1,
+          orderingCost: a.orderingCost,
+          holdingCost: a.holdingCost,
+          holdingCostUnit: a.holdingCostUnit || "per_unit_per_day",
+          holdingCostPerUnitPerDay: hDay,
+          shortagePenalty: a.shortagePenalty,
+          leadTimeDays: a.leadTimeDays,
+          targetServiceLevel: a.targetServiceLevel,
+        },
+      };
+    }
+
+    case "optimization_sku": {
+      const skuOpt = optimizationRun?.result?.skus?.[skuId];
+      if (!skuOpt) return null;
+      return {
+        artifactType: "optimization_run",
+        artifactId: optimizationRun._id.toString(),
+        skuId,
+        label: `Optimization for SKU ${skuId}`,
+        payload: skuOpt,
+      };
+    }
+
+    case "optimization_aggregate": {
+      if (!optimizationRun?.result) return null;
+      return {
+        artifactType: "optimization_run",
+        artifactId: optimizationRun._id.toString(),
+        skuId: null,
+        label: "Optimization aggregate",
+        payload: {
+          skusCount: Object.keys(optimizationRun.result.skus || {}).length,
+        },
+      };
+    }
+
+    case "simulation_sku": {
+      const skuSim = simulationRun?.result?.skus?.[skuId];
+      if (!skuSim) return null;
+      return {
+        artifactType: "simulation_run",
+        artifactId: simulationRun._id.toString(),
+        skuId,
+        label: `Simulation for SKU ${skuId}`,
+        payload: skuSim,
+      };
+    }
+
+    case "simulation_aggregate": {
+      const simAgg = simulationRun?.result?.aggregate;
+      if (!simAgg) return null;
+      return {
+        artifactType: "simulation_run",
+        artifactId: simulationRun._id.toString(),
+        skuId: null,
+        label: "Simulation aggregate",
+        payload: simAgg,
+      };
+    }
+
+    default:
+      return null;
+  }
+}
