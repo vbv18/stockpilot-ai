@@ -42,11 +42,12 @@ server.use(
 server.use(express.json({ limit: "1mb" }));
 server.use(cookieParser());
 
+// Mount existing legacy routes under /api/v1 for backward compatibility
+server.use("/api/v1", legacyApp);
+
 // (f) mount v1Router at /api/v1 (health check and new v1 routes)
 server.use("/api/v1", v1Router);
 
-// Mount existing legacy routes under /api/v1 for backward compatibility
-server.use("/api/v1", legacyApp);
 
 // (g) at the end add notFoundHandler then errorHandler
 server.use(notFoundHandler);

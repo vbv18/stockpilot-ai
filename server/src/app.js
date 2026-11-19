@@ -6,8 +6,7 @@ import userRouter from "./routes/user.route.js";
 
 const app = Router();
 
-app.use("/auth", asyncHandler(authRouter));
-app.use(authMiddleware);
-app.use("/user", asyncHandler(userRouter));
+app.use("/auth", authRouter);
+app.use("/user", authMiddleware, userRouter);
 
 export default app;

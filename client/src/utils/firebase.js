@@ -7,11 +7,11 @@ import { getAuth, GoogleAuthProvider } from "firebase/auth";
 // Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: "agentforge-92fdc.firebaseapp.com",
-  projectId: "agentforge-92fdc",
-  storageBucket: "agentforge-92fdc.firebasestorage.app",
-  messagingSenderId: "442806675623",
-  appId: "1:442806675623:web:eb0d2c1858ddcdb0b51382",
+  authDomain: "stockpilot-ai-2c61a.firebaseapp.com",
+  projectId: "stockpilot-ai-2c61a",
+  storageBucket: "stockpilot-ai-2c61a.firebasestorage.app",
+  messagingSenderId: "685692848484",
+  appId: "1:685692848484:web:d3b3ec83691815b1201271",
 };
 
 // Initialize Firebase

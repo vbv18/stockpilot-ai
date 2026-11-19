@@ -24,7 +24,7 @@ async function getIdToken(forceRefresh = false) {
 
 export function getBaseUrl() {
   const raw = import.meta.env.VITE_API_URL || "http://localhost:8000";
-  return raw.replace(/\/+$/, "");
+  return raw.replace(/\/+$/, "").replace(/\/api\/v1$/, "");
 }
 
 export async function apiFetch(path, init = {}) {

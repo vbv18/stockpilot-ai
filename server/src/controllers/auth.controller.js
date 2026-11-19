@@ -4,48 +4,70 @@ import * as userRepository from "../repositories/user.repositories.js";
 import * as sessionRepository from "../repositories/session.repositories.js";
 import { setCookie, clearCookie } from "../utils/cookies.js";
 
-export async function login(req, res) {
-  const { token } = req.body;
-  console.log(req.user);
+export async function login(req, res, next) {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({
+        error: {
+          code: "VALIDATION_ERROR",
+          message: "Firebase token is required",
+        },
+      });
+    }
 
-  const decoded = await getAuth(app).verifyIdToken(token);
-  let user = await userRepository.findOneUser({
-    firebaseUid: decoded.uid,
-    email: decoded.email,
-  });
+    let decoded;
+    try {
+      decoded = await getAuth(app).verifyIdToken(token);
+    } catch (authErr) {
+      return res.status(401).json({
+        error: {
+          code: "UNAUTHENTICATED",
+          message: "Invalid or expired Firebase token: " + authErr.message,
+        },
+      });
+    }
 
-  if (!user) {
-    user = await userRepository.createUser({
+    let user = await userRepository.findOneUser({
       firebaseUid: decoded.uid,
-      name: decoded.name,
       email: decoded.email,
-      avatar: decoded.picture,
     });
-  } else {
-    let updated = false;
-    if (!user.firebaseUid && decoded.uid) {
-      user.firebaseUid = decoded.uid;
-      updated = true;
+
+    if (!user) {
+      user = await userRepository.createUser({
+        firebaseUid: decoded.uid,
+        name: decoded.name || decoded.email || "User",
+        email: decoded.email,
+        avatar: decoded.picture,
+      });
+    } else {
+      let updated = false;
+      if (!user.firebaseUid && decoded.uid) {
+        user.firebaseUid = decoded.uid;
+        updated = true;
+      }
+      if (decoded.picture && user.avatar !== decoded.picture) {
+        user.avatar = decoded.picture;
+        updated = true;
+      }
+      if (updated) {
+        await user.save();
+      }
     }
-    if (decoded.picture && user.avatar !== decoded.picture) {
-      user.avatar = decoded.picture;
-      updated = true;
-    }
-    if (updated) {
-      await user.save();
-    }
+
+    const sessionId = crypto.randomUUID();
+
+    await sessionRepository.setSession(user._id, sessionId, user);
+
+    setCookie(res, "session", sessionId);
+
+    return res.status(200).json({
+      message: "Logged In Successfuly",
+      user,
+    });
+  } catch (err) {
+    next(err);
   }
-
-  const sessionId = crypto.randomUUID();
-
-  await sessionRepository.setSession(user._id, sessionId, user);
-
-  setCookie(res, "session", sessionId);
-
-  return res.status(200).json({
-    message: "Logged In Successfuly",
-    user,
-  });
 }
 
 export async function logout(req, res) {

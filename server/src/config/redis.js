@@ -1,11 +1,12 @@
 import { Redis } from "@upstash/redis";
-import { ENV } from "./config.js";
+import { getEnv } from "./env.js";
 
-const url = ENV.UPSTASH_REDIS_REST_URL;
-const token = ENV.UPSTASH_REDIS_REST_TOKEN;
+const env = getEnv();
+const url = env.UPSTASH_REDIS_REST_URL;
+const token = env.UPSTASH_REDIS_REST_TOKEN;
 
 if (!url || !token) {
-  throw new Error("REDIS_URL is not configured");
+  throw new Error("UPSTASH_REDIS is not configured");
 }
 
 async function checkRedisConnection() {
