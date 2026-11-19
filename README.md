@@ -95,11 +95,11 @@ npm run dev
 | `QDRANT_API_KEY` | Qdrant authentication API key | `qdrant-secret-key` |
 | `QDRANT_COLLECTION` | Qdrant collection name | `stockpilot_artifacts` |
 | `EMBEDDING_PROVIDER` | Embeddings provider (`gemini` or `openai`) | `gemini` |
-| `EMBEDDING_MODEL` | Embedding model identifier | `text-embedding-004` |
+| `EMBEDDING_MODEL` | Embedding model identifier | `gemini-embedding-001` |
 | `EMBEDDING_API_KEY` | Embedding provider API key | `ai-embedding-key` |
-| `EMBEDDING_DIM` | Embedding vector dimension | `768` |
-| `LLM_PROVIDER` | LLM provider (`gemini` or `openai`) | `gemini` |
-| `LLM_MODEL` | LLM model identifier | `gemini-1.5-pro` |
+| `EMBEDDING_DIM` | Embedding vector dimension | `3072` |
+| `LLM_PROVIDER` | LLM provider (`groq`, `gemini`, `openai`, `anthropic`) | `groq` |
+| `LLM_MODEL` | LLM model identifier | `llama-3.3-70b-versatile` |
 | `LLM_API_KEY` | LLM provider API key | `ai-llm-key` |
 | `RATE_LIMIT_GENERAL_PER_MINUTE` | General API rate limit | `120` |
 | `RATE_LIMIT_UPLOADS_PER_HOUR` | Upload rate limit per user | `10` |
