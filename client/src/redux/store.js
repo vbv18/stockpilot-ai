@@ -1,12 +1,12 @@
 import { configureStore } from "@reduxjs/toolkit";
 import userReducer from "./userSlice.js";
-// import conversationReducer from "./conversationSlice.js";
-// import messageReducer from "./messageSlice.js";
+import { stockpilotApi } from "../lib/api.js";
 
 export const store = configureStore({
   reducer: {
     user: userReducer,
-    // conversation: conversationReducer,
-    // message: messageReducer,
+    [stockpilotApi.reducerPath]: stockpilotApi.reducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().concat(stockpilotApi.middleware),
 });
