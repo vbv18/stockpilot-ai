@@ -2,6 +2,7 @@ import { Router } from "express";
 import { SERVICE_NAME } from "../../config/constants.js";
 import authMiddleware from "../../middlewares/auth.middleware.js";
 import { attachUser } from "../../auth/currentUser.js";
+import { aiLimiter, generalLimiter, uploadLimiter } from "../../middlewares/rateLimit.js";
 
 // Import stage job handlers to register them
 import "../../services/datasetHandlers.js";
@@ -36,17 +37,18 @@ router.get("/health", (req, res) => {
 const authenticatedRouter = Router();
 authenticatedRouter.use(authMiddleware);
 authenticatedRouter.use(attachUser());
+authenticatedRouter.use(generalLimiter);
 
 // Mount session routes
 authenticatedRouter.use("/sessions", sessionsRouter);
 authenticatedRouter.use("/sessions/:sessionId/jobs", jobsRouter);
-authenticatedRouter.use("/sessions/:sessionId/dataset", datasetsRouter);
+authenticatedRouter.use("/sessions/:sessionId/dataset", uploadLimiter, datasetsRouter);
 authenticatedRouter.use("/sessions/:sessionId/forecast", forecastRouter);
 authenticatedRouter.use("/sessions/:sessionId/assumptions", assumptionsRouter);
 authenticatedRouter.use("/sessions/:sessionId/optimization", optimizationRouter);
 authenticatedRouter.use("/sessions/:sessionId/optimize", optimizationRouter);
 authenticatedRouter.use("/sessions/:sessionId/simulations", simulationsRouter);
-authenticatedRouter.use("/ai", aiRouter);
+authenticatedRouter.use("/ai", aiLimiter, aiRouter);
 
 router.use(authenticatedRouter);
 

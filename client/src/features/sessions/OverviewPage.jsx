@@ -1,7 +1,8 @@
-import { Link, useOutletContext } from "react-router-dom";
-import { Archive, ArchiveRestore, ArrowUpRight, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Link, useNavigate, useOutletContext } from "react-router-dom";
+import { Archive, ArchiveRestore, ArrowUpRight, Sparkles, Trash2 } from "lucide-react";
 import { fmtDateTime, shortId } from "../../lib/format.js";
-import { usePatchSessionMutation } from "../../lib/api.js";
+import { useDeleteSessionMutation, usePatchSessionMutation } from "../../lib/api.js";
 
 const AI_ELIGIBLE_STATUSES = [
   "forecast_ready",
@@ -16,7 +17,25 @@ const AI_ELIGIBLE_STATUSES = [
 
 export default function OverviewPage() {
   const { session } = useOutletContext();
+  const navigate = useNavigate();
   const [patchSession] = usePatchSessionMutation();
+  const [deleteSession, { isLoading: isDeleting }] = useDeleteSessionMutation();
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [confirmName, setConfirmName] = useState("");
+  const [deleteError, setDeleteError] = useState("");
+
+  const handleDelete = async (e) => {
+    e.preventDefault();
+    if (confirmName !== session.name) return;
+    setDeleteError("");
+    try {
+      await deleteSession(session.id).unwrap();
+      navigate("/sessions");
+    } catch (err) {
+      setDeleteError(err?.message || err?.data?.error?.message || "Failed to delete session.");
+    }
+  };
 
   const stages = [
     {
@@ -101,6 +120,19 @@ export default function OverviewPage() {
           >
             {isArchived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
             <span>{isArchived ? "Unarchive" : "Archive"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmName("");
+              setDeleteError("");
+              setShowDeleteModal(true);
+            }}
+            className="flex items-center gap-1.5 px-3 py-2 bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/20 text-xs font-medium rounded-xl text-rose-300 transition-colors cursor-pointer"
+          >
+            <Trash2 size={14} />
+            <span>Delete analysis</span>
           </button>
         </div>
       </div>
@@ -197,6 +229,68 @@ export default function OverviewPage() {
           );
         })}
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+          onClick={() => setShowDeleteModal(false)}
+        >
+          <div
+            className="bg-[#13151c] border border-rose-500/20 rounded-2xl p-6 max-w-md w-full shadow-2xl flex flex-col gap-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2.5 text-rose-400 font-semibold text-base">
+              <Trash2 size={20} />
+              <span>Delete Analysis Session</span>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              This action is <strong className="text-rose-400">permanent and irrecoverable</strong>. All datasets, forecasts, assumptions, optimization recommendations, simulation results, and AI conversation history will be permanently deleted.
+            </p>
+
+            <form onSubmit={handleDelete} className="flex flex-col gap-3 mt-1">
+              <div className="flex flex-col gap-1 text-xs">
+                <label className="text-slate-400">
+                  Please type <span className="font-mono text-white select-all">"{session.name}"</span> to confirm:
+                </label>
+                <input
+                  type="text"
+                  value={confirmName}
+                  onChange={(e) => setConfirmName(e.target.value)}
+                  placeholder={session.name}
+                  className="bg-[#0d0f14] border border-white/[0.1] rounded-xl px-3 py-2 text-white text-xs focus:outline-none focus:border-rose-500"
+                  autoFocus
+                />
+              </div>
+
+              {deleteError && (
+                <div className="p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs">
+                  {deleteError}
+                </div>
+              )}
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={isDeleting}
+                  className="px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={confirmName !== session.name || isDeleting}
+                  className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold text-white shadow-lg shadow-rose-900/30"
+                >
+                  {isDeleting ? "Deleting..." : "Permanently Delete"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -83,6 +83,14 @@ export const stockpilotApi = createApi({
       ],
     }),
 
+    deleteSession: builder.mutation({
+      query: (id) => ({
+        url: `/sessions/${id}`,
+        method: "DELETE",
+      }),
+      invalidatesTags: [{ type: "Sessions", id: "LIST" }],
+    }),
+
     putMapping: builder.mutation({
       query: ({ id, body }) => ({
         url: `/sessions/${id}/dataset/mapping`,
@@ -314,6 +322,7 @@ export const {
   useCreateSessionMutation,
   useGetSessionQuery,
   usePatchSessionMutation,
+  useDeleteSessionMutation,
   usePutMappingMutation,
   useGetValidationQuery,
   useConfirmDatasetMutation,
