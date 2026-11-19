@@ -8,6 +8,7 @@ import { logger } from "./src/lib/logger.js";
 import { requestContext } from "./src/middlewares/requestContext.js";
 import { connectDatabase } from "./src/config/db.js";
 import { errorHandler, notFoundHandler } from "./src/middlewares/errorHandler.js";
+import { recoverInterruptedJobs } from "./src/services/jobRunner.js";
 import v1Router from "./src/routes/v1/index.js";
 import legacyApp from "./src/app.js";
 
@@ -55,6 +56,7 @@ const port = env.PORT;
 
 server.listen(port, async () => {
   await connectDatabase();
+  await recoverInterruptedJobs();
   logger.info(`Backend Service is running on port ${port}`);
 });
 

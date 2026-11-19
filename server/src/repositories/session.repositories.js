@@ -7,6 +7,7 @@ export async function setSession(userId, sessionId, user) {
       `session-${sessionId}`,
       JSON.stringify({
         userId,
+        firebaseUid: user.firebaseUid,
         name: user.name,
         email: user.email,
         avatar: user.avatar,
