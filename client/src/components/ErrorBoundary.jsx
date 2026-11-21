@@ -20,9 +20,12 @@ export class ErrorBoundary extends Component {
       return (
         <div className="min-h-screen bg-[#0d0f14] text-white flex flex-col items-center justify-center p-6 text-center">
           <div className="max-w-md bg-[#13151c] border border-rose-500/20 rounded-2xl p-6 shadow-2xl flex flex-col gap-4">
-            <h2 className="text-lg font-semibold text-rose-300">Something went wrong</h2>
+            <h2 className="text-lg font-semibold text-rose-300">
+              Something went wrong
+            </h2>
             <p className="text-xs text-slate-400">
-              {this.state.error?.message || "An unexpected error occurred in the application."}
+              {this.state.error?.message ||
+                "An unexpected error occurred in the application."}
             </p>
             <div className="flex gap-3 justify-center mt-2">
               <button
@@ -48,4 +51,3 @@ export class ErrorBoundary extends Component {
 }
 
 export default ErrorBoundary;
-

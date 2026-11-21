@@ -1,8 +1,19 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Archive, ArchiveRestore, Edit2, Loader2, Plus, Sparkles } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  Edit2,
+  Loader2,
+  Plus,
+  Sparkles,
+} from "lucide-react";
 import { StatusBadge } from "../../components/StatusBadge.jsx";
-import { useCreateSessionMutation, useListSessionsQuery, usePatchSessionMutation } from "../../lib/api.js";
+import {
+  useCreateSessionMutation,
+  useListSessionsQuery,
+  usePatchSessionMutation,
+} from "../../lib/api.js";
 import { fmtDateTime } from "../../lib/format.js";
 
 export default function SessionsPage() {
@@ -10,7 +21,12 @@ export default function SessionsPage() {
   const [page, setPage] = useState(1);
   const [showArchived, setShowArchived] = useState(false);
 
-  const { data: response, isLoading, error, refetch } = useListSessionsQuery({
+  const {
+    data: response,
+    isLoading,
+    error,
+    refetch,
+  } = useListSessionsQuery({
     page,
     limit: 20,
     archived: showArchived,
@@ -49,7 +65,10 @@ export default function SessionsPage() {
     <div className="min-h-screen bg-[#0d0f14] text-slate-100 flex flex-col">
       <header className="border-b border-white/[0.08] bg-[#13151c]/60 backdrop-blur-md px-8 py-5 flex items-center justify-between sticky top-0 z-30">
         <div className="flex items-center gap-3">
-          <Link to="/" className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+          <Link
+            to="/"
+            className="text-base font-bold text-white tracking-tight flex items-center gap-2"
+          >
             <span className="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block" />
             StockPilot AI
           </Link>
@@ -72,7 +91,11 @@ export default function SessionsPage() {
             onClick={handleCreate}
             className="flex items-center gap-2 px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-semibold text-white shadow-md shadow-indigo-700/20 transition-all cursor-pointer disabled:opacity-60"
           >
-            {isCreating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {isCreating ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Plus size={14} />
+            )}
             <span>New Analysis</span>
           </button>
         </div>
@@ -85,7 +108,8 @@ export default function SessionsPage() {
               {showArchived ? "Archived Analyses" : "Inventory Analyses"}
             </h1>
             <p className="text-xs text-slate-400 mt-1">
-              Select an analysis to inspect forecasts, safety stocks, and simulated policies.
+              Select an analysis to inspect forecasts, safety stocks, and
+              simulated policies.
             </p>
           </div>
         </div>
@@ -100,7 +124,9 @@ export default function SessionsPage() {
               {error?.data?.message || "Failed to load sessions."}
             </p>
             {error?.data?.requestId && (
-              <span className="text-[11px] text-slate-500">Reference: {error.data.requestId}</span>
+              <span className="text-[11px] text-slate-500">
+                Reference: {error.data.requestId}
+              </span>
             )}
             <button
               onClick={() => refetch()}
@@ -114,7 +140,9 @@ export default function SessionsPage() {
             <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
               <Sparkles size={24} />
             </div>
-            <h3 className="text-base font-semibold text-slate-200">No sessions found</h3>
+            <h3 className="text-base font-semibold text-slate-200">
+              No sessions found
+            </h3>
             <p className="text-xs text-slate-400 max-w-sm">
               {showArchived
                 ? "You do not have any archived sessions."
@@ -137,11 +165,24 @@ export default function SessionsPage() {
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-white/[0.08] text-slate-400 bg-white/[0.02]">
-                    <th scope="col" className="px-5 py-3.5 font-medium">Name</th>
-                    <th scope="col" className="px-5 py-3.5 font-medium">Status</th>
-                    <th scope="col" className="px-5 py-3.5 font-medium">Stage Summary</th>
-                    <th scope="col" className="px-5 py-3.5 font-medium">Updated</th>
-                    <th scope="col" className="px-5 py-3.5 font-medium text-right">Actions</th>
+                    <th scope="col" className="px-5 py-3.5 font-medium">
+                      Name
+                    </th>
+                    <th scope="col" className="px-5 py-3.5 font-medium">
+                      Status
+                    </th>
+                    <th scope="col" className="px-5 py-3.5 font-medium">
+                      Stage Summary
+                    </th>
+                    <th scope="col" className="px-5 py-3.5 font-medium">
+                      Updated
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-5 py-3.5 font-medium text-right"
+                    >
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.04]">
@@ -153,7 +194,11 @@ export default function SessionsPage() {
                       <tr
                         key={sess.id}
                         onClick={(e) => {
-                          if (e.target.closest("button") || e.target.closest("input")) return;
+                          if (
+                            e.target.closest("button") ||
+                            e.target.closest("input")
+                          )
+                            return;
                           navigate(`/sessions/${sess.id}`);
                         }}
                         className="hover:bg-white/[0.02] cursor-pointer transition-colors"
@@ -203,8 +248,14 @@ export default function SessionsPage() {
 
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            {["dataset", "forecast", "optimization", "simulation"].map((stg) => {
-                              const s = sess.stages?.[stg]?.status || "not_started";
+                            {[
+                              "dataset",
+                              "forecast",
+                              "optimization",
+                              "simulation",
+                            ].map((stg) => {
+                              const s =
+                                sess.stages?.[stg]?.status || "not_started";
                               return (
                                 <span
                                   key={stg}
@@ -212,10 +263,10 @@ export default function SessionsPage() {
                                     s === "succeeded"
                                       ? "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20"
                                       : s === "running"
-                                      ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
-                                      : s === "failed"
-                                      ? "bg-rose-500/10 text-rose-300 border border-rose-500/20"
-                                      : "bg-slate-800/60 text-slate-500"
+                                        ? "bg-amber-500/10 text-amber-300 border border-amber-500/20"
+                                        : s === "failed"
+                                          ? "bg-rose-500/10 text-rose-300 border border-rose-500/20"
+                                          : "bg-slate-800/60 text-slate-500"
                                   }`}
                                 >
                                   {stg.slice(0, 3)}
@@ -237,9 +288,17 @@ export default function SessionsPage() {
                               handleToggleArchive(sess.id, isArchived);
                             }}
                             className="p-1.5 text-slate-400 hover:text-slate-200 rounded-lg hover:bg-slate-800 transition-colors"
-                            title={isArchived ? "Unarchive session" : "Archive session"}
+                            title={
+                              isArchived
+                                ? "Unarchive session"
+                                : "Archive session"
+                            }
                           >
-                            {isArchived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
+                            {isArchived ? (
+                              <ArchiveRestore size={14} />
+                            ) : (
+                              <Archive size={14} />
+                            )}
                           </button>
                         </td>
                       </tr>

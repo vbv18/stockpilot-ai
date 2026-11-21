@@ -13,17 +13,26 @@ export class LocalStorageAdapter {
 
   _resolveKey(key) {
     if (typeof key !== "string" || !key) {
-      throw new AppError(500, "Invalid storage key", { details: "Key must be a non-empty string" });
+      throw new AppError(500, "Invalid storage key", {
+        details: "Key must be a non-empty string",
+      });
     }
     const segments = key.split("/");
     for (const seg of segments) {
       if (!KEY_SEGMENT_REGEX.test(seg) || seg === "." || seg === "..") {
-        throw new AppError(500, "Invalid storage key", { details: `Invalid segment: ${seg}` });
+        throw new AppError(500, "Invalid storage key", {
+          details: `Invalid segment: ${seg}`,
+        });
       }
     }
     const resolved = path.resolve(this.rootDir, ...segments);
-    if (!resolved.startsWith(this.rootDir + path.sep) && resolved !== this.rootDir) {
-      throw new AppError(500, "Invalid storage key", { details: "Key resolves outside storage directory" });
+    if (
+      !resolved.startsWith(this.rootDir + path.sep) &&
+      resolved !== this.rootDir
+    ) {
+      throw new AppError(500, "Invalid storage key", {
+        details: "Key resolves outside storage directory",
+      });
     }
     return resolved;
   }

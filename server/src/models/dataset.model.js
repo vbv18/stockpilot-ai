@@ -72,7 +72,15 @@ const datasetSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["uploaded", "validating", "validated", "validation_failed", "transforming", "ready", "replaced"],
+      enum: [
+        "uploaded",
+        "validating",
+        "validated",
+        "validation_failed",
+        "transforming",
+        "ready",
+        "replaced",
+      ],
       default: "uploaded",
     },
     error: {

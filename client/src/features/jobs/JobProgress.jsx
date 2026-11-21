@@ -1,5 +1,12 @@
 import { useCancelJobMutation } from "../../lib/api.js";
-import { AlertCircle, CheckCircle, Clock, Loader2, RefreshCw, XCircle } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Loader2,
+  RefreshCw,
+  XCircle,
+} from "lucide-react";
 
 export function JobProgress({ sessionId, job, onRetry }) {
   const [cancelJob, { isLoading: isCancelling }] = useCancelJobMutation();
@@ -14,11 +21,21 @@ export function JobProgress({ sessionId, job, onRetry }) {
     <div className="bg-[#13151c] border border-white/[0.08] rounded-xl p-4 my-4 shadow-lg">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
-          {job.status === "running" && <Loader2 className="animate-spin text-indigo-400" size={16} />}
-          {job.status === "queued" && <Clock className="text-amber-400" size={16} />}
-          {job.status === "succeeded" && <CheckCircle className="text-emerald-400" size={16} />}
-          {job.status === "failed" && <AlertCircle className="text-rose-400" size={16} />}
-          {job.status === "cancelled" && <XCircle className="text-slate-400" size={16} />}
+          {job.status === "running" && (
+            <Loader2 className="animate-spin text-indigo-400" size={16} />
+          )}
+          {job.status === "queued" && (
+            <Clock className="text-amber-400" size={16} />
+          )}
+          {job.status === "succeeded" && (
+            <CheckCircle className="text-emerald-400" size={16} />
+          )}
+          {job.status === "failed" && (
+            <AlertCircle className="text-rose-400" size={16} />
+          )}
+          {job.status === "cancelled" && (
+            <XCircle className="text-slate-400" size={16} />
+          )}
 
           <span className="text-sm font-medium text-white capitalize">
             {job.type} Job: {job.status}
@@ -73,9 +90,13 @@ export function JobProgress({ sessionId, job, onRetry }) {
 
       {isFailed && job.error && (
         <div className="mt-3 p-2.5 rounded-lg bg-rose-500/10 border border-rose-500/20 text-rose-300 text-xs flex flex-col gap-1">
-          <div className="font-medium">{job.error.message || "An error occurred."}</div>
+          <div className="font-medium">
+            {job.error.message || "An error occurred."}
+          </div>
           {job.error.code && (
-            <div className="text-[10px] text-rose-400/80">Code: {job.error.code}</div>
+            <div className="text-[10px] text-rose-400/80">
+              Code: {job.error.code}
+            </div>
           )}
         </div>
       )}

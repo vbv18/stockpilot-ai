@@ -1,7 +1,12 @@
 import { AppError } from "../../../lib/errors.js";
 import { AssumptionsBody } from "../../../contracts/pipeline.js";
 import { RunWhatIfInput, RunWhatIfOutput } from "../../../contracts/ai.js";
-import { PyOptimizeRequest, PyOptimizeResponse, PySimulateRequest, PySimulateResponse } from "../../../contracts/python.js";
+import {
+  PyOptimizeRequest,
+  PyOptimizeResponse,
+  PySimulateRequest,
+  PySimulateResponse,
+} from "../../../contracts/python.js";
 import { WhatIfRunModel } from "../../../models/whatIfRun.model.js";
 import { statsPost } from "../../statsClient.js";
 
@@ -13,7 +18,8 @@ const runningWhatIfUsers = new Set();
  */
 export async function runWhatIfScenario(rawArgs, bundle, ctx) {
   const args = RunWhatIfInput.parse(rawArgs);
-  const { session, forecastRun, optimizationRun, simulationRun, assumptions } = bundle;
+  const { session, forecastRun, optimizationRun, simulationRun, assumptions } =
+    bundle;
 
   if (
     !forecastRun ||
@@ -49,7 +55,9 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
     };
 
     // Validate with AssumptionsBody omitting confirmed
-    const validatedEffective = AssumptionsBody.omit({ confirmed: true }).parse(effective);
+    const validatedEffective = AssumptionsBody.omit({ confirmed: true }).parse(
+      effective,
+    );
 
     // Baseline assumptions view
     const baseHday =
@@ -218,10 +226,18 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
     };
 
     const deltas = {
-      deterministicTotalCost: scenarioTotals.deterministic.totalCost - baselineTotals.deterministic.totalCost,
-      uncertaintyAwareTotalCost: scenarioTotals.uncertaintyAware.totalCost - baselineTotals.uncertaintyAware.totalCost,
-      deterministicServiceLevel: scenarioTotals.deterministic.serviceLevel - baselineTotals.deterministic.serviceLevel,
-      uncertaintyAwareServiceLevel: scenarioTotals.uncertaintyAware.serviceLevel - baselineTotals.uncertaintyAware.serviceLevel,
+      deterministicTotalCost:
+        scenarioTotals.deterministic.totalCost -
+        baselineTotals.deterministic.totalCost,
+      uncertaintyAwareTotalCost:
+        scenarioTotals.uncertaintyAware.totalCost -
+        baselineTotals.uncertaintyAware.totalCost,
+      deterministicServiceLevel:
+        scenarioTotals.deterministic.serviceLevel -
+        baselineTotals.deterministic.serviceLevel,
+      uncertaintyAwareServiceLevel:
+        scenarioTotals.uncertaintyAware.serviceLevel -
+        baselineTotals.uncertaintyAware.serviceLevel,
     };
 
     const perSku = [];
@@ -233,7 +249,13 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
       const sSim = simResult.skus?.[skuId];
       const bSim = baseSimSkus[skuId];
 
-      if (bOpt && sOpt.status === "ok" && bOpt.status === "ok" && sSim && bSim) {
+      if (
+        bOpt &&
+        sOpt.status === "ok" &&
+        bOpt.status === "ok" &&
+        sSim &&
+        bSim
+      ) {
         const sDetCost = sSim.deterministic?.mean_total_cost ?? 0;
         const bDetCost = bSim.deterministic?.mean_total_cost ?? 0;
         const sUncCost = sSim.uncertainty_aware?.mean_total_cost ?? 0;

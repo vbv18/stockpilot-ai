@@ -12,7 +12,12 @@ import {
 import { COPY } from "../../lib/copy.js";
 import { fmtNum, fmtPct } from "../../lib/format.js";
 
-export function ForecastChart({ skuId, skuForecast, skuEvaluation, historySeries }) {
+export function ForecastChart({
+  skuId,
+  skuForecast,
+  skuEvaluation,
+  historySeries,
+}) {
   const [view, setView] = useState("forecast"); // "forecast" | "holdout"
 
   // 1. Forecast view data: last 90 days of history + 28 days of forecast
@@ -21,7 +26,9 @@ export function ForecastChart({ skuId, skuForecast, skuEvaluation, historySeries
 
     const data = [];
     const histVals = historySeries?.values || [];
-    const histStart = historySeries?.startDate ? new Date(historySeries.startDate) : new Date();
+    const histStart = historySeries?.startDate
+      ? new Date(historySeries.startDate)
+      : new Date();
 
     // Last 90 points of history
     const sliceCount = Math.min(90, histVals.length);
@@ -120,10 +127,13 @@ export function ForecastChart({ skuId, skuForecast, skuEvaluation, historySeries
       {/* Header & Toggle */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <span className="font-mono text-xs font-semibold text-indigo-400">{skuId}</span>
+          <span className="font-mono text-xs font-semibold text-indigo-400">
+            {skuId}
+          </span>
           <p className="text-xs text-slate-300 font-medium mt-0.5">
-            {skuId}: AutoETS averages {fmtNum(avgForecast, 1)} units/day over the next 28 days;
-            P10-P90 average {fmtNum(avgP10, 1)}-{fmtNum(avgP90, 1)}.
+            {skuId}: AutoETS averages {fmtNum(avgForecast, 1)} units/day over
+            the next 28 days; P10-P90 average {fmtNum(avgP10, 1)}-
+            {fmtNum(avgP90, 1)}.
           </p>
         </div>
 
@@ -132,7 +142,9 @@ export function ForecastChart({ skuId, skuForecast, skuEvaluation, historySeries
             type="button"
             onClick={() => setView("forecast")}
             className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-              view === "forecast" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+              view === "forecast"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-slate-400 hover:text-slate-200"
             }`}
           >
             Forecast
@@ -141,7 +153,9 @@ export function ForecastChart({ skuId, skuForecast, skuEvaluation, historySeries
             type="button"
             onClick={() => setView("holdout")}
             className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-              view === "holdout" ? "bg-indigo-600 text-white shadow-sm" : "text-slate-400 hover:text-slate-200"
+              view === "holdout"
+                ? "bg-indigo-600 text-white shadow-sm"
+                : "text-slate-400 hover:text-slate-200"
             }`}
           >
             Holdout Check
@@ -152,7 +166,10 @@ export function ForecastChart({ skuId, skuForecast, skuEvaluation, historySeries
       {/* Chart Canvas */}
       <div className="h-64 w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+          <ComposedChart
+            data={chartData}
+            margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+          >
             <XAxis
               dataKey="date"
               tickLine={false}
@@ -231,7 +248,11 @@ export function ForecastChart({ skuId, skuForecast, skuEvaluation, historySeries
                 x={skuForecast.forecast_start_date}
                 stroke="#e2e8f0"
                 strokeDasharray="3 3"
-                label={{ value: "Forecast starts", fill: "#94a3b8", fontSize: 10 }}
+                label={{
+                  value: "Forecast starts",
+                  fill: "#94a3b8",
+                  fontSize: 10,
+                }}
               />
             )}
           </ComposedChart>
@@ -264,28 +285,58 @@ export function ForecastChart({ skuId, skuForecast, skuEvaluation, historySeries
           <table className="w-full text-left text-xs font-mono">
             <thead>
               <tr className="border-b border-white/[0.04] text-slate-500">
-                <th scope="col" className="py-1">Model</th>
-                <th scope="col" className="py-1 text-right">MAE</th>
-                <th scope="col" className="py-1 text-right">RMSE</th>
-                <th scope="col" className="py-1 text-right">WAPE</th>
-                <th scope="col" className="py-1 text-right">Coverage</th>
-                <th scope="col" className="py-1 text-right">Width</th>
+                <th scope="col" className="py-1">
+                  Model
+                </th>
+                <th scope="col" className="py-1 text-right">
+                  MAE
+                </th>
+                <th scope="col" className="py-1 text-right">
+                  RMSE
+                </th>
+                <th scope="col" className="py-1 text-right">
+                  WAPE
+                </th>
+                <th scope="col" className="py-1 text-right">
+                  Coverage
+                </th>
+                <th scope="col" className="py-1 text-right">
+                  Width
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.02] text-slate-300">
               <tr>
                 <td className="py-1 font-sans text-indigo-300">AutoETS</td>
-                <td className="py-1 text-right">{fmtNum(skuEvaluation.autoets?.mae, 2)}</td>
-                <td className="py-1 text-right">{fmtNum(skuEvaluation.autoets?.rmse, 2)}</td>
-                <td className="py-1 text-right">{fmtPct(skuEvaluation.autoets?.wape, 1)}</td>
-                <td className="py-1 text-right">{fmtPct(skuEvaluation.interval_metrics?.coverage, 1)}</td>
-                <td className="py-1 text-right">{fmtNum(skuEvaluation.interval_metrics?.mean_width, 1)}</td>
+                <td className="py-1 text-right">
+                  {fmtNum(skuEvaluation.autoets?.mae, 2)}
+                </td>
+                <td className="py-1 text-right">
+                  {fmtNum(skuEvaluation.autoets?.rmse, 2)}
+                </td>
+                <td className="py-1 text-right">
+                  {fmtPct(skuEvaluation.autoets?.wape, 1)}
+                </td>
+                <td className="py-1 text-right">
+                  {fmtPct(skuEvaluation.interval_metrics?.coverage, 1)}
+                </td>
+                <td className="py-1 text-right">
+                  {fmtNum(skuEvaluation.interval_metrics?.mean_width, 1)}
+                </td>
               </tr>
               <tr>
-                <td className="py-1 font-sans text-amber-300">Seasonal Naive</td>
-                <td className="py-1 text-right">{fmtNum(skuEvaluation.seasonal_naive?.mae, 2)}</td>
-                <td className="py-1 text-right">{fmtNum(skuEvaluation.seasonal_naive?.rmse, 2)}</td>
-                <td className="py-1 text-right">{fmtPct(skuEvaluation.seasonal_naive?.wape, 1)}</td>
+                <td className="py-1 font-sans text-amber-300">
+                  Seasonal Naive
+                </td>
+                <td className="py-1 text-right">
+                  {fmtNum(skuEvaluation.seasonal_naive?.mae, 2)}
+                </td>
+                <td className="py-1 text-right">
+                  {fmtNum(skuEvaluation.seasonal_naive?.rmse, 2)}
+                </td>
+                <td className="py-1 text-right">
+                  {fmtPct(skuEvaluation.seasonal_naive?.wape, 1)}
+                </td>
                 <td className="py-1 text-right">-</td>
                 <td className="py-1 text-right">-</td>
               </tr>

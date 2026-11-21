@@ -1,6 +1,8 @@
 import { z } from "zod";
 
-export const ObjectIdString = z.string().regex(/^[a-fA-F0-9]{24}$/, "Invalid id");
+export const ObjectIdString = z
+  .string()
+  .regex(/^[a-fA-F0-9]{24}$/, "Invalid id");
 
 export const IsoDate = z
   .string()
@@ -24,27 +26,79 @@ export const PaginationQuery = z
   .strict();
 
 export const SESSION_STATUSES = [
-  "created", "uploading", "validating", "dataset_ready", "forecasting", "forecast_ready",
-  "assumptions_pending", "optimizing", "optimization_ready", "simulating", "completed",
-  "validation_failed", "forecast_failed", "optimization_failed", "simulation_failed", "cancelled",
+  "created",
+  "uploading",
+  "validating",
+  "dataset_ready",
+  "forecasting",
+  "forecast_ready",
+  "assumptions_pending",
+  "optimizing",
+  "optimization_ready",
+  "simulating",
+  "completed",
+  "validation_failed",
+  "forecast_failed",
+  "optimization_failed",
+  "simulation_failed",
+  "cancelled",
 ];
 export const SessionStatus = z.enum(SESSION_STATUSES);
 
-export const STAGE_NAMES = ["dataset", "forecast", "optimization", "simulation"];
+export const STAGE_NAMES = [
+  "dataset",
+  "forecast",
+  "optimization",
+  "simulation",
+];
 export const StageName = z.enum(STAGE_NAMES);
-export const StageStatus = z.enum(["not_started", "running", "succeeded", "failed", "cancelled"]);
+export const StageStatus = z.enum([
+  "not_started",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
 
-export const JOB_STAGES = ["validation", "transformation", "forecast", "optimization", "simulation"];
+export const JOB_STAGES = [
+  "validation",
+  "transformation",
+  "forecast",
+  "optimization",
+  "simulation",
+];
 export const JobStage = z.enum(JOB_STAGES);
-export const JobStatus = z.enum(["queued", "running", "succeeded", "failed", "cancelled"]);
+export const JobStatus = z.enum([
+  "queued",
+  "running",
+  "succeeded",
+  "failed",
+  "cancelled",
+]);
 
 export const ERROR_CODES = [
-  "VALIDATION_ERROR", "UNAUTHENTICATED", "NOT_FOUND", "CONFLICT", "INVALID_STATE",
-  "FILE_TOO_LARGE", "UNSUPPORTED_MEDIA_TYPE", "UNPROCESSABLE", "RATE_LIMITED",
-  "DATASET_VALIDATION_FAILED", "NEGATIVE_QUANTITY_POLICY_REQUIRED", "COVERAGE_ASSUMPTION_REQUIRED",
-  "NO_ELIGIBLE_SKUS", "JOB_CANCELLED", "SERVER_RESTART",
-  "UPSTREAM_STATS_ERROR", "UPSTREAM_LLM_ERROR", "UPSTREAM_VECTOR_ERROR", "AI_RESPONSE_INVALID",
-  "AI_SESSION_NOT_ELIGIBLE", "SERVICE_UNAVAILABLE", "INTERNAL_ERROR",
+  "VALIDATION_ERROR",
+  "UNAUTHENTICATED",
+  "NOT_FOUND",
+  "CONFLICT",
+  "INVALID_STATE",
+  "FILE_TOO_LARGE",
+  "UNSUPPORTED_MEDIA_TYPE",
+  "UNPROCESSABLE",
+  "RATE_LIMITED",
+  "DATASET_VALIDATION_FAILED",
+  "NEGATIVE_QUANTITY_POLICY_REQUIRED",
+  "COVERAGE_ASSUMPTION_REQUIRED",
+  "NO_ELIGIBLE_SKUS",
+  "JOB_CANCELLED",
+  "SERVER_RESTART",
+  "UPSTREAM_STATS_ERROR",
+  "UPSTREAM_LLM_ERROR",
+  "UPSTREAM_VECTOR_ERROR",
+  "AI_RESPONSE_INVALID",
+  "AI_SESSION_NOT_ELIGIBLE",
+  "SERVICE_UNAVAILABLE",
+  "INTERNAL_ERROR",
 ];
 export const ErrorCode = z.enum(ERROR_CODES);
 

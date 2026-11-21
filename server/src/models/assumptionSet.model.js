@@ -58,5 +58,8 @@ const assumptionSetSchema = new mongoose.Schema(
 
 assumptionSetSchema.index({ sessionId: 1, version: 1 }, { unique: true });
 
-export const AssumptionSetModel = mongoose.model("assumption_sets", assumptionSetSchema);
+export const AssumptionSetModel = mongoose.model(
+  "assumption_sets",
+  assumptionSetSchema,
+);
 export default AssumptionSetModel;

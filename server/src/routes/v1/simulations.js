@@ -10,7 +10,12 @@ import { OptimizationRunModel } from "../../models/optimizationRun.model.js";
 import { SimulationRunModel } from "../../models/simulationRun.model.js";
 import { enqueueJob } from "../../services/jobRunner.js";
 import { computeSkuRisk } from "../../services/risk.js";
-import { getSessionOwned, requireStatus, setStage, transition } from "../../services/sessionService.js";
+import {
+  getSessionOwned,
+  requireStatus,
+  setStage,
+  transition,
+} from "../../services/sessionService.js";
 import { ACTION_ALLOWED_FROM } from "../../services/stateMachine.js";
 
 const router = Router({ mergeParams: true });
@@ -38,7 +43,10 @@ router.post(
       requireStatus(session, ACTION_ALLOWED_FROM.simulate);
 
       if (!session.activeOptimizationRunId) {
-        throw new AppError("INVALID_STATE", "Active optimization run is required before simulation.");
+        throw new AppError(
+          "INVALID_STATE",
+          "Active optimization run is required before simulation.",
+        );
       }
 
       const optRun = await OptimizationRunModel.findOne({
@@ -47,11 +55,20 @@ router.post(
         sessionId: params.sessionId,
       });
       if (!optRun || optRun.status !== "succeeded") {
-        throw new AppError("INVALID_STATE", "Active optimization run must be succeeded.");
+        throw new AppError(
+          "INVALID_STATE",
+          "Active optimization run must be succeeded.",
+        );
       }
 
-      if (session.activeAssumptionSetId?.toString() !== optRun.assumptionSetId.toString()) {
-        throw new AppError("INVALID_STATE", "Re-run optimization for the latest assumptions first.");
+      if (
+        session.activeAssumptionSetId?.toString() !==
+        optRun.assumptionSetId.toString()
+      ) {
+        throw new AppError(
+          "INVALID_STATE",
+          "Re-run optimization for the latest assumptions first.",
+        );
       }
 
       const optimizationRunId = optRun._id.toString();
@@ -90,39 +107,35 @@ router.post(
 );
 
 // GET /sessions/:sessionId/simulations
-router.get(
-  "/",
-  validate({ params: IdParam }),
-  async (req, res, next) => {
-    try {
-      const user = getUser(res);
-      const { params } = getValidated(res);
-      await getSessionOwned(user.userId, params.sessionId);
+router.get("/", validate({ params: IdParam }), async (req, res, next) => {
+  try {
+    const user = getUser(res);
+    const { params } = getValidated(res);
+    await getSessionOwned(user.userId, params.sessionId);
 
-      const runs = await SimulationRunModel.find({
-        sessionId: params.sessionId,
-        userId: user.userId,
-      })
-        .sort({ createdAt: -1 })
-        .limit(20);
+    const runs = await SimulationRunModel.find({
+      sessionId: params.sessionId,
+      userId: user.userId,
+    })
+      .sort({ createdAt: -1 })
+      .limit(20);
 
-      const items = runs.map((r) => ({
-        id: r._id.toString(),
-        status: r.status,
-        createdAt: r.createdAt ? r.createdAt.toISOString() : null,
-        scenarioCount: r.scenarioCount,
-        horizonDays: r.horizonDays,
-        seed: r.seed,
-        optimizationRunId: r.optimizationRunId.toString(),
-        aggregate: r.policyResults?.aggregate || null,
-      }));
+    const items = runs.map((r) => ({
+      id: r._id.toString(),
+      status: r.status,
+      createdAt: r.createdAt ? r.createdAt.toISOString() : null,
+      scenarioCount: r.scenarioCount,
+      horizonDays: r.horizonDays,
+      seed: r.seed,
+      optimizationRunId: r.optimizationRunId.toString(),
+      aggregate: r.policyResults?.aggregate || null,
+    }));
 
-      return res.status(200).json({ data: items });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+    return res.status(200).json({ data: items });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // GET /sessions/:sessionId/simulations/:simulationId
 router.get(
@@ -143,8 +156,12 @@ router.get(
         throw new AppError("NOT_FOUND", "Simulation run not found");
       }
 
-      const optRun = await OptimizationRunModel.findById(simRun.optimizationRunId);
-      const forecastRun = optRun ? await ForecastRunModel.findById(optRun.forecastRunId) : null;
+      const optRun = await OptimizationRunModel.findById(
+        simRun.optimizationRunId,
+      );
+      const forecastRun = optRun
+        ? await ForecastRunModel.findById(optRun.forecastRunId)
+        : null;
 
       const evalBySku = new Map();
       if (forecastRun?.result?.evaluation?.skus) {

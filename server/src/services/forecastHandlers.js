@@ -1,5 +1,9 @@
 import { FORECAST_DEFAULTS } from "../config/constants.js";
-import { PyEvaluateResponse, PyForecastRequest, PyForecastResponse } from "../contracts/python.js";
+import {
+  PyEvaluateResponse,
+  PyForecastRequest,
+  PyForecastResponse,
+} from "../contracts/python.js";
 import { AppError } from "../lib/errors.js";
 import { AnalysisSessionModel } from "../models/analysisSession.model.js";
 import { ForecastRunModel } from "../models/forecastRun.model.js";
@@ -99,7 +103,10 @@ registerJobHandler("forecast", {
     };
     const resultStr = JSON.stringify(result);
     if (Buffer.byteLength(resultStr, "utf-8") > 12 * 1024 * 1024) {
-      throw new AppError("INTERNAL_ERROR", "Forecast result size exceeds 12 MB limit.");
+      throw new AppError(
+        "INTERNAL_ERROR",
+        "Forecast result size exceeds 12 MB limit.",
+      );
     }
 
     forecastRun.status = "succeeded";
@@ -124,7 +131,12 @@ registerJobHandler("forecast", {
 
     scheduleReindex(ctx.userId, ctx.sessionId, "forecast");
 
-    return { resultRef: { collection: "forecast_runs", id: forecastRun._id.toString() } };
+    return {
+      resultRef: {
+        collection: "forecast_runs",
+        id: forecastRun._id.toString(),
+      },
+    };
   },
 
   async onFailed(ctx, failure) {
@@ -138,7 +150,9 @@ registerJobHandler("forecast", {
         },
       },
     );
-    await transition(ctx.userId, ctx.sessionId, "forecast_failed").catch(() => {});
+    await transition(ctx.userId, ctx.sessionId, "forecast_failed").catch(
+      () => {},
+    );
     await setStage(ctx.userId, ctx.sessionId, "forecast", {
       status: "failed",
       errorCode: failure.code,
@@ -152,7 +166,9 @@ registerJobHandler("forecast", {
       { jobId: ctx.jobId, userId: ctx.userId },
       { $set: { status: "cancelled" } },
     );
-    await transition(ctx.userId, ctx.sessionId, "dataset_ready").catch(() => {});
+    await transition(ctx.userId, ctx.sessionId, "dataset_ready").catch(
+      () => {},
+    );
     await setStage(ctx.userId, ctx.sessionId, "forecast", {
       status: "cancelled",
     });

@@ -6,9 +6,7 @@ export default defineConfig([
   globalIgnores(["dist", "node_modules"]),
   {
     files: ["**/*.{js}"],
-    extends: [
-      js.configs.recommended,
-    ],
+    extends: [js.configs.recommended],
     languageOptions: {
       globals: globals.browser,
     },

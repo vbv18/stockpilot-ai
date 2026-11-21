@@ -1,4 +1,8 @@
-import { HumanMessage, SystemMessage, ToolMessage } from "@langchain/core/messages";
+import {
+  HumanMessage,
+  SystemMessage,
+  ToolMessage,
+} from "@langchain/core/messages";
 import { tool } from "@langchain/core/tools";
 import { Annotation, END, START, StateGraph } from "@langchain/langgraph";
 import { zodToJsonSchema } from "zod-to-json-schema";
@@ -9,7 +13,6 @@ import {
   TOOL_NAMES,
 } from "../../contracts/ai.js";
 import { AppError } from "../../lib/errors.js";
-import { logger } from "../../lib/logger.js";
 import { WhatIfRunModel } from "../../models/whatIfRun.model.js";
 import { buildSessionRisk } from "../risk.js";
 import { searchSession } from "../vector/retrieval.js";
@@ -29,7 +32,15 @@ const MAX_TOOL_STEPS = 6;
 const MAX_TOTAL_TOOL_CALLS = 8;
 
 export async function runAgent(input) {
-  const { userId, sessionId, conversationId, requestId, signal, question, history = [] } = input;
+  const {
+    userId,
+    sessionId,
+    conversationId,
+    requestId,
+    signal,
+    question,
+    history = [],
+  } = input;
   const startTime = Date.now();
 
   const ledger = new EvidenceLedger();
@@ -51,27 +62,32 @@ export async function runAgent(input) {
   const toolDefs = [
     tool(async (args) => JSON.stringify(args), {
       name: "get_sku_forecast",
-      description: "Get SKU demand forecast, prediction intervals and holdout metrics.",
+      description:
+        "Get SKU demand forecast, prediction intervals and holdout metrics.",
       schema: TOOL_INPUT_SCHEMAS.get_sku_forecast,
     }),
     tool(async (args) => JSON.stringify(args), {
       name: "get_inventory_recommendation",
-      description: "Get EOQ, deterministic and uncertainty-aware ROP recommendations for a SKU.",
+      description:
+        "Get EOQ, deterministic and uncertainty-aware ROP recommendations for a SKU.",
       schema: TOOL_INPUT_SCHEMAS.get_inventory_recommendation,
     }),
     tool(async (args) => JSON.stringify(args), {
       name: "compare_inventory_policies",
-      description: "Compare deterministic vs uncertainty-aware policy outcomes across simulation scenarios.",
+      description:
+        "Compare deterministic vs uncertainty-aware policy outcomes across simulation scenarios.",
       schema: TOOL_INPUT_SCHEMAS.compare_inventory_policies,
     }),
     tool(async (args) => JSON.stringify(args), {
       name: "run_what_if_scenario",
-      description: "Simulate a what-if inventory scenario under overridden cost, lead time, or service level assumptions.",
+      description:
+        "Simulate a what-if inventory scenario under overridden cost, lead time, or service level assumptions.",
       schema: TOOL_INPUT_SCHEMAS.run_what_if_scenario,
     }),
     tool(async (args) => JSON.stringify(args), {
       name: "get_inventory_risk_summary",
-      description: "Rank and summarize SKUs by stockout risk, uncertainty gap and risk flags.",
+      description:
+        "Rank and summarize SKUs by stockout risk, uncertainty gap and risk flags.",
       schema: TOOL_INPUT_SCHEMAS.get_inventory_risk_summary,
     }),
   ];
@@ -93,14 +109,19 @@ export async function runAgent(input) {
 
   // 1. Prepare Node
   async function prepareNode() {
-    if (signal?.aborted) throw new AppError("JOB_CANCELLED", "The operation was cancelled.");
+    if (signal?.aborted)
+      throw new AppError("JOB_CANCELLED", "The operation was cancelled.");
 
     bundle = await loadSessionBundle(userId, sessionId);
 
     let risks = null;
     if (bundle.optimizationRun) {
       try {
-        risks = buildSessionRisk(bundle.optimizationRun, bundle.simulationRun, bundle.assumptions);
+        risks = buildSessionRisk(
+          bundle.optimizationRun,
+          bundle.simulationRun,
+          bundle.assumptions,
+        );
       } catch {
         risks = [];
       }
@@ -121,11 +142,22 @@ export async function runAgent(input) {
     // Retrieval
     let searchHits = [];
     try {
-      const mainHits = await searchSession({ userId, sessionId, query: question, limit: 8 });
+      const mainHits = await searchSession({
+        userId,
+        sessionId,
+        query: question,
+        limit: 8,
+      });
       searchHits.push(...mainHits);
 
       for (const skuId of mentionedSkus.slice(0, 3)) {
-        const skuHits = await searchSession({ userId, sessionId, query: question, limit: 4, skuId });
+        const skuHits = await searchSession({
+          userId,
+          sessionId,
+          query: question,
+          limit: 4,
+          skuId,
+        });
         searchHits.push(...skuHits);
       }
     } catch {
@@ -181,7 +213,9 @@ export async function runAgent(input) {
       ...retrievedEvidenceBlocks,
       ``,
       `CONVERSATION SO FAR:`,
-      ...(history.slice(-6).map((m) => `${m.role.toUpperCase()}: ${m.content}`) || []),
+      ...(history
+        .slice(-6)
+        .map((m) => `${m.role.toUpperCase()}: ${m.content}`) || []),
       ``,
       `QUESTION: ${question}`,
     ];
@@ -197,7 +231,8 @@ export async function runAgent(input) {
 
   // 2. Agent Node
   async function agentNode(state) {
-    if (signal?.aborted) throw new AppError("JOB_CANCELLED", "The operation was cancelled.");
+    if (signal?.aborted)
+      throw new AppError("JOB_CANCELLED", "The operation was cancelled.");
 
     const llm = getChatModel();
     const modelWithTools = llm.bindTools(toolDefs);
@@ -211,7 +246,8 @@ export async function runAgent(input) {
 
   // 3. Tools Node (Custom Node)
   async function toolsNode(state) {
-    if (signal?.aborted) throw new AppError("JOB_CANCELLED", "The operation was cancelled.");
+    if (signal?.aborted)
+      throw new AppError("JOB_CANCELLED", "The operation was cancelled.");
 
     const lastMessage = state.messages[state.messages.length - 1];
     const toolCalls = lastMessage.tool_calls || [];
@@ -221,12 +257,16 @@ export async function runAgent(input) {
 
     for (const call of toolCalls) {
       if (totalToolExecutions >= MAX_TOTAL_TOOL_CALLS) {
-        extraWarnings.push("Tool execution limit reached; some calculations were omitted.");
+        extraWarnings.push(
+          "Tool execution limit reached; some calculations were omitted.",
+        );
         toolMessages.push(
           new ToolMessage({
             tool_call_id: call.id,
             name: call.name,
-            content: JSON.stringify({ error: { code: "TOOL_LIMIT", message: "Execution limit reached" } }),
+            content: JSON.stringify({
+              error: { code: "TOOL_LIMIT", message: "Execution limit reached" },
+            }),
           }),
         );
         continue;
@@ -245,7 +285,9 @@ export async function runAgent(input) {
           new ToolMessage({
             tool_call_id: call.id,
             name: call.name,
-            content: JSON.stringify({ error: { code: "UNKNOWN_TOOL", message: "Tool not allowed" } }),
+            content: JSON.stringify({
+              error: { code: "UNKNOWN_TOOL", message: "Tool not allowed" },
+            }),
           }),
         );
         continue;
@@ -265,7 +307,12 @@ export async function runAgent(input) {
           new ToolMessage({
             tool_call_id: call.id,
             name: call.name,
-            content: JSON.stringify({ error: { code: "INVALID_ARGUMENTS", message: "Invalid arguments" } }),
+            content: JSON.stringify({
+              error: {
+                code: "INVALID_ARGUMENTS",
+                message: "Invalid arguments",
+              },
+            }),
           }),
         );
         continue;
@@ -275,7 +322,11 @@ export async function runAgent(input) {
       const toolCtx = { userId, sessionId, requestId, signal };
 
       try {
-        const { output, evidence } = await handler(parsedArgs.data, bundle, toolCtx);
+        const { output, evidence } = await handler(
+          parsedArgs.data,
+          bundle,
+          toolCtx,
+        );
 
         // Add to ledger
         const entry = ledger.add({
@@ -307,11 +358,17 @@ export async function runAgent(input) {
           new ToolMessage({
             tool_call_id: call.id,
             name: call.name,
-            content: JSON.stringify({ evidenceId: entry.evidenceId, result: output }),
+            content: JSON.stringify({
+              evidenceId: entry.evidenceId,
+              result: output,
+            }),
           }),
         );
       } catch (err) {
-        logger.warn({ tool: call.name, err: err.message }, "Tool execution error");
+        console.warn("Tool execution error", {
+          tool: call.name,
+          err: err.message,
+        });
         toolTrace.push({
           tool: call.name,
           status: "error",
@@ -343,10 +400,15 @@ export async function runAgent(input) {
   function shouldContinue(state) {
     const lastMessage = state.messages[state.messages.length - 1];
     if (lastMessage.tool_calls && lastMessage.tool_calls.length > 0) {
-      if (state.stepCount < MAX_TOOL_STEPS && totalToolExecutions < MAX_TOTAL_TOOL_CALLS) {
+      if (
+        state.stepCount < MAX_TOOL_STEPS &&
+        totalToolExecutions < MAX_TOTAL_TOOL_CALLS
+      ) {
         return "tools";
       }
-      extraWarnings.push("Tool-call limit reached; the answer may be incomplete.");
+      extraWarnings.push(
+        "Tool-call limit reached; the answer may be incomplete.",
+      );
     }
     return "compose";
   }
@@ -356,10 +418,15 @@ export async function runAgent(input) {
   let composeAttempts = 0;
 
   async function composeNode(state) {
-    if (signal?.aborted) throw new AppError("JOB_CANCELLED", "The operation was cancelled.");
+    if (signal?.aborted)
+      throw new AppError("JOB_CANCELLED", "The operation was cancelled.");
 
     const llm = getChatModel();
-    const jsonSchemaStr = JSON.stringify(zodToJsonSchema(AssistantDraft, "AssistantDraft"), null, 2);
+    const jsonSchemaStr = JSON.stringify(
+      zodToJsonSchema(AssistantDraft, "AssistantDraft"),
+      null,
+      2,
+    );
 
     const evidenceListLines = ledger.all().map((e) => {
       const firstKeys = (e.keys || []).slice(0, 25).join(", ");
@@ -375,10 +442,17 @@ export async function runAgent(input) {
     for (let attempt = 1; attempt <= 3; attempt++) {
       composeAttempts = attempt;
       const res = await llm.invoke(messages);
-      const rawText = res.content ? (typeof res.content === "string" ? res.content : JSON.stringify(res.content)) : "";
+      const rawText = res.content
+        ? typeof res.content === "string"
+          ? res.content
+          : JSON.stringify(res.content)
+        : "";
 
       // Strip code fences
-      const cleanJson = rawText.replace(/```(?:json)?/gi, "").replace(/```/g, "").trim();
+      const cleanJson = rawText
+        .replace(/```(?:json)?/gi, "")
+        .replace(/```/g, "")
+        .trim();
 
       try {
         const parsed = JSON.parse(cleanJson);
@@ -387,7 +461,10 @@ export async function runAgent(input) {
           parsedDraft = validated.data;
           return { messages: [res] };
         } else {
-          logger.warn({ issues: validated.error.issues, attempt }, "Draft validation issues");
+          console.warn("Draft validation issues", {
+            issues: validated.error.issues,
+            attempt,
+          });
           if (attempt < 3) {
             const issueSummary = validated.error.issues
               .slice(0, 10)
@@ -402,7 +479,7 @@ export async function runAgent(input) {
           }
         }
       } catch {
-        logger.warn({ attempt }, "Draft JSON unparseable");
+        console.warn("Draft JSON unparseable", { attempt });
         if (attempt < 3) {
           messages.push(res);
           messages.push(
@@ -424,7 +501,10 @@ export async function runAgent(input) {
   let groundedResponse = null;
   async function verifyNode() {
     if (!parsedDraft) {
-      throw new AppError("INTERNAL_ERROR", "No parsed draft available for verification.");
+      throw new AppError(
+        "INTERNAL_ERROR",
+        "No parsed draft available for verification.",
+      );
     }
 
     const grounded = groundDraft({
@@ -439,8 +519,13 @@ export async function runAgent(input) {
     try {
       groundedResponse = AssistantResponse.parse(grounded);
     } catch (valErr) {
-      logger.error({ err: valErr.message }, "AssistantResponse schema validation failed");
-      throw new AppError("INTERNAL_ERROR", "Failed to validate grounded assistant response");
+      console.error("AssistantResponse schema validation failed", {
+        err: valErr.message,
+      });
+      throw new AppError(
+        "INTERNAL_ERROR",
+        "Failed to validate grounded assistant response",
+      );
     }
 
     return {};
@@ -464,10 +549,35 @@ export async function runAgent(input) {
 
   // Run with 120s timeout
   const timeoutPromise = new Promise((_, reject) => {
-    setTimeout(() => reject(new AppError("UPSTREAM_LLM_ERROR", "AI processing timed out")), 120_000);
+    setTimeout(
+      () =>
+        reject(new AppError("UPSTREAM_LLM_ERROR", "AI processing timed out")),
+      120_000,
+    );
   });
 
-  await Promise.race([app.invoke({ messages: [] }), timeoutPromise]);
+  try {
+    await Promise.race([app.invoke({ messages: [] }), timeoutPromise]);
+  } catch (err) {
+    if (err instanceof AppError) throw err;
+    const msg = err.message || "";
+    if (
+      err.status === 429 ||
+      msg.includes("rate_limit") ||
+      msg.includes("429") ||
+      err.code === "rate_limit_exceeded"
+    ) {
+      throw new AppError(
+        "RATE_LIMITED",
+        "AI provider rate limit reached. Please wait a moment and try again.",
+        { retryable: true, cause: err },
+      );
+    }
+    throw new AppError("UPSTREAM_LLM_ERROR", msg || "AI provider error", {
+      retryable: true,
+      cause: err,
+    });
+  }
 
   const latencyMs = Date.now() - startTime;
   const env = (await import("../../config/env.js")).getEnv();

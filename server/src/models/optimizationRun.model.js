@@ -53,5 +53,8 @@ const optimizationRunSchema = new mongoose.Schema(
 
 optimizationRunSchema.index({ userId: 1, sessionId: 1, createdAt: -1 });
 
-export const OptimizationRunModel = mongoose.model("optimization_runs", optimizationRunSchema);
+export const OptimizationRunModel = mongoose.model(
+  "optimization_runs",
+  optimizationRunSchema,
+);
 export default OptimizationRunModel;

@@ -7,6 +7,7 @@ This document outlines deployment architectures, interface binding, network boun
 ## 1. Interface Binding & Network Boundaries
 
 ### 1.1 Python Stats Service (`stats-service/`)
+
 - **Default Port**: `8000`
 - **Security Requirement**: The Python statistical engine processes numerical simulations and statistical forecasts. It relies on the shared secret `STATS_SERVICE_KEY` passed in the `X-Service-Key` header.
 - **Private Interface Binding**: The stats service MUST NEVER be bound to public interfaces (`0.0.0.0`) in production.
@@ -14,6 +15,7 @@ This document outlines deployment architectures, interface binding, network boun
   - In cloud/cluster deployments (e.g., Kubernetes, AWS ECS, GCP Cloud Run): run within an isolated VPC, private subnet, or internal service mesh accessible only by the Node.js API server.
 
 ### 1.2 Qdrant Vector Store
+
 - **Security Requirement**: Qdrant stores vectorized semantic summaries of sessions, datasets, forecasts, policies, and simulations.
 - **Access Boundary**:
   - Restrict access strictly to the Node.js backend using Qdrant API keys (`QDRANT_API_KEY`) and firewall rules.
@@ -21,6 +23,7 @@ This document outlines deployment architectures, interface binding, network boun
   - Never expose Qdrant to public internet traffic directly.
 
 ### 1.3 MongoDB Database
+
 - **Security Requirement**: MongoDB holds multi-tenant operational data, metadata, and user assets.
 - **Access Boundary**:
   - Configure MongoDB authentication (`SCRAM-SHA-256` or x.509 certificates).
@@ -28,6 +31,7 @@ This document outlines deployment architectures, interface binding, network boun
   - Enable TLS encryption in transit (`tls=true` in MongoDB connection URI).
 
 ### 1.4 Redis Cache & Job Queues
+
 - **Security Requirement**: Redis coordinates job locks, distributed idempotency keys, and BullMQ task queues.
 - **Access Boundary**:
   - Require strong authentication (`requirepass` or Upstash Redis token).

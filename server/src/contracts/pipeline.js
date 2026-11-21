@@ -1,6 +1,10 @@
 import { z } from "zod";
 import { Seed } from "./common.js";
-import { DEMO_ASSUMPTION_DEFAULTS, SIMULATION_BOUNDS, SIMULATION_DEFAULTS } from "../config/constants.js";
+import {
+  DEMO_ASSUMPTION_DEFAULTS,
+  SIMULATION_BOUNDS,
+  SIMULATION_DEFAULTS,
+} from "../config/constants.js";
 
 export const HOLDING_COST_UNITS = ["per_unit_per_day", "per_unit_per_year"];
 export const HoldingCostUnit = z.enum(HOLDING_COST_UNITS);
@@ -20,12 +24,22 @@ export const AssumptionsBody = z
   .strict();
 
 export const AssumptionFieldKey = z.enum([
-  "orderingCost", "holdingCost", "holdingCostUnit", "shortagePenalty", "leadTimeDays", "targetServiceLevel",
+  "orderingCost",
+  "holdingCost",
+  "holdingCostUnit",
+  "shortagePenalty",
+  "leadTimeDays",
+  "targetServiceLevel",
 ]);
-export const AssumptionProvenance = z.enum(["demonstration_default", "user_provided"]);
+export const AssumptionProvenance = z.enum([
+  "demonstration_default",
+  "user_provided",
+]);
 
 export function holdingCostDaily(a) {
-  return a.holdingCostUnit === "per_unit_per_day" ? a.holdingCost : a.holdingCost / 365;
+  return a.holdingCostUnit === "per_unit_per_day"
+    ? a.holdingCost
+    : a.holdingCost / 365;
 }
 
 export function computeProvenance(a) {
@@ -43,16 +57,35 @@ export function computeProvenance(a) {
 
 export const SimulationBody = z
   .object({
-    nScenarios: z.number().int().min(SIMULATION_BOUNDS.nScenariosMin).max(SIMULATION_BOUNDS.nScenariosMax).default(SIMULATION_DEFAULTS.nScenarios),
-    horizonDays: z.number().int().min(SIMULATION_BOUNDS.horizonMin).max(SIMULATION_BOUNDS.horizonMax).default(SIMULATION_DEFAULTS.horizonDays),
+    nScenarios: z
+      .number()
+      .int()
+      .min(SIMULATION_BOUNDS.nScenariosMin)
+      .max(SIMULATION_BOUNDS.nScenariosMax)
+      .default(SIMULATION_DEFAULTS.nScenarios),
+    horizonDays: z
+      .number()
+      .int()
+      .min(SIMULATION_BOUNDS.horizonMin)
+      .max(SIMULATION_BOUNDS.horizonMax)
+      .default(SIMULATION_DEFAULTS.horizonDays),
     seed: Seed.optional(),
   })
   .strict();
 
-export const SessionCreateBody = z.object({ name: z.string().trim().min(1).max(120).optional() }).strict();
+export const SessionCreateBody = z
+  .object({ name: z.string().trim().min(1).max(120).optional() })
+  .strict();
 export const SessionPatchBody = z
-  .object({ name: z.string().trim().min(1).max(120).optional(), archived: z.boolean().optional() })
+  .object({
+    name: z.string().trim().min(1).max(120).optional(),
+    archived: z.boolean().optional(),
+  })
   .strict()
-  .refine((b) => b.name !== undefined || b.archived !== undefined, { message: "Provide name or archived" });
+  .refine((b) => b.name !== undefined || b.archived !== undefined, {
+    message: "Provide name or archived",
+  });
 
-export const IdParam = z.object({ sessionId: z.string().regex(/^[a-fA-F0-9]{24}$/) }).strict();
+export const IdParam = z
+  .object({ sessionId: z.string().regex(/^[a-fA-F0-9]{24}$/) })
+  .strict();

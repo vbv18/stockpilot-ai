@@ -22,7 +22,8 @@ import { COPY } from "../../lib/copy.js";
 const ERROR_MAPPINGS = {
   SERVICE_UNAVAILABLE: "AI analysis is not configured on this server.",
   UPSTREAM_LLM_ERROR: "The AI provider is unavailable. Try again shortly.",
-  AI_RESPONSE_INVALID: "The AI could not produce a valid answer. Try rephrasing.",
+  AI_RESPONSE_INVALID:
+    "The AI could not produce a valid answer. Try rephrasing.",
   RATE_LIMITED: "Too many questions. Wait a moment.",
   AI_SESSION_NOT_ELIGIBLE: "This session is not ready for AI analysis.",
   CONFLICT: "Still working on the previous question.",
@@ -44,16 +45,15 @@ export function ConversationPage() {
     error: convError,
   } = useGetConversationQuery(conversationId);
 
-  const {
-    data: messages = [],
-  } = useListMessagesQuery({ id: conversationId });
+  const { data: messages = [] } = useListMessagesQuery({ id: conversationId });
 
   // Optional optimization query to sniff first SKU for starter prompts
   const { data: optData } = useGetOptimizationQuery(conv?.sessionId, {
     skip: !conv?.sessionId,
   });
 
-  const [sendMessage, { isLoading: isSending, error: sendError }] = useSendMessageMutation();
+  const [sendMessage, { isLoading: isSending, error: sendError }] =
+    useSendMessageMutation();
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -124,7 +124,10 @@ export function ConversationPage() {
   const firstSku = optData?.skus ? Object.keys(optData.skus)[0] : "SKU-001";
 
   const STARTER_PROMPTS = [
-    { title: "Risk Prioritization", text: "Which SKUs have the highest stockout risk?" },
+    {
+      title: "Risk Prioritization",
+      text: "Which SKUs have the highest stockout risk?",
+    },
     {
       title: "ROP Explanation",
       text: `Why is the recommended reorder point for ${firstSku} what it is?`,
@@ -196,9 +199,12 @@ export function ConversationPage() {
               <Brain size={24} />
             </div>
             <div>
-              <h2 className="text-base font-semibold text-white">Ask StockPilot AI</h2>
+              <h2 className="text-base font-semibold text-white">
+                Ask StockPilot AI
+              </h2>
               <p className="text-xs text-slate-400 max-w-md mt-1">
-                Explore forecasting models, policy differences, holdout accuracy, and what-if scenarios grounded in your session data.
+                Explore forecasting models, policy differences, holdout
+                accuracy, and what-if scenarios grounded in your session data.
               </p>
             </div>
 
@@ -307,7 +313,9 @@ export function ConversationPage() {
           </div>
           <div className="flex justify-between items-center text-[10px] text-slate-500 px-1">
             <span>Press Enter to send, Shift+Enter for new line</span>
-            <span>Numbers are grounded strictly in session analysis results</span>
+            <span>
+              Numbers are grounded strictly in session analysis results
+            </span>
           </div>
         </div>
       </footer>

@@ -13,12 +13,22 @@ import { search } from "./qdrantStore.js";
  * @param {string} [args.skuId]
  * @returns {Promise<Array<{ score: number, artifactType: string, artifactId: string, skuId: string|null, text: string }>>}
  */
-export async function searchSession({ userId, sessionId, query, limit = 8, skuId }) {
+export async function searchSession({
+  userId,
+  sessionId,
+  query,
+  limit = 8,
+  skuId,
+}) {
   const embedder = getEmbedder();
   if (!embedder) {
-    throw new AppError("UPSTREAM_VECTOR_ERROR", "Semantic retrieval is unavailable.", {
-      retryable: true,
-    });
+    throw new AppError(
+      "UPSTREAM_VECTOR_ERROR",
+      "Semantic retrieval is unavailable.",
+      {
+        retryable: true,
+      },
+    );
   }
 
   const queryVector = await embedder.embedQuery(query);

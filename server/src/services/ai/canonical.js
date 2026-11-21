@@ -4,12 +4,23 @@ import { buildSessionRisk } from "../risk.js";
  * Builds compact session digest with raw numbers and no prose
  */
 export function buildSessionDigest(bundle, risks = null) {
-  const { session, dataset, forecastRun, assumptions, optimizationRun, simulationRun } = bundle;
+  const {
+    session,
+    dataset,
+    forecastRun,
+    assumptions,
+    optimizationRun,
+    simulationRun,
+  } = bundle;
 
   let computedRisks = risks;
   if (!computedRisks && optimizationRun) {
     try {
-      computedRisks = buildSessionRisk(optimizationRun, simulationRun, assumptions);
+      computedRisks = buildSessionRisk(
+        optimizationRun,
+        simulationRun,
+        assumptions,
+      );
     } catch {
       computedRisks = [];
     }
@@ -21,7 +32,9 @@ export function buildSessionDigest(bundle, risks = null) {
   if (assumptions && assumptions.values) {
     const a = assumptions.values;
     const hDay =
-      a.holdingCostUnit === "per_unit_per_year" ? a.holdingCost / 365 : a.holdingCost;
+      a.holdingCostUnit === "per_unit_per_year"
+        ? a.holdingCost / 365
+        : a.holdingCost;
     assumptionsView = {
       version: assumptions.version ?? 1,
       orderingCost: a.orderingCost,
@@ -56,7 +69,9 @@ export function buildSessionDigest(bundle, risks = null) {
 
     const autoetsMean = fData?.autoets_mean || [];
     const avgDailyForecast =
-      autoetsMean.length > 0 ? autoetsMean.reduce((a, b) => a + b, 0) / autoetsMean.length : null;
+      autoetsMean.length > 0
+        ? autoetsMean.reduce((a, b) => a + b, 0) / autoetsMean.length
+        : null;
 
     skus.push({
       skuId,
@@ -103,7 +118,14 @@ export function buildSessionDigest(bundle, risks = null) {
  * Maps a Qdrant hit back to its Mongo canonical record
  */
 export function loadCanonicalForHit(bundle, hit) {
-  const { session, dataset, forecastRun, assumptions, optimizationRun, simulationRun } = bundle;
+  const {
+    session,
+    dataset,
+    forecastRun,
+    assumptions,
+    optimizationRun,
+    simulationRun,
+  } = bundle;
   const { artifactType, artifactId, skuId } = hit;
 
   switch (artifactType) {
@@ -169,7 +191,10 @@ export function loadCanonicalForHit(bundle, hit) {
     case "assumption_set": {
       if (!assumptions?.values) return null;
       const a = assumptions.values;
-      const hDay = a.holdingCostUnit === "per_unit_per_year" ? a.holdingCost / 365 : a.holdingCost;
+      const hDay =
+        a.holdingCostUnit === "per_unit_per_year"
+          ? a.holdingCost / 365
+          : a.holdingCost;
       return {
         artifactType: "assumption_set",
         artifactId: assumptions._id.toString(),

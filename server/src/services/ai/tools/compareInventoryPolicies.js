@@ -1,5 +1,8 @@
 import { AppError } from "../../../lib/errors.js";
-import { CompareInventoryPoliciesInput, CompareInventoryPoliciesOutput } from "../../../contracts/ai.js";
+import {
+  CompareInventoryPoliciesInput,
+  CompareInventoryPoliciesOutput,
+} from "../../../contracts/ai.js";
 
 /**
  * compare_inventory_policies tool
@@ -9,7 +12,10 @@ export async function compareInventoryPolicies(rawArgs, bundle) {
   const { simulationRun } = bundle;
 
   if (!simulationRun || !simulationRun.result) {
-    throw new AppError("NOT_FOUND", "Simulation run not found for this session");
+    throw new AppError(
+      "NOT_FOUND",
+      "Simulation run not found for this session",
+    );
   }
 
   const simResult = simulationRun.result;
@@ -18,7 +24,10 @@ export async function compareInventoryPolicies(rawArgs, bundle) {
   if (args.skuId) {
     const skuSim = simResult.skus?.[args.skuId];
     if (!skuSim) {
-      throw new AppError("NOT_FOUND", `SKU ${args.skuId} is not part of this simulation`);
+      throw new AppError(
+        "NOT_FOUND",
+        `SKU ${args.skuId} is not part of this simulation`,
+      );
     }
 
     const output = CompareInventoryPoliciesOutput.parse({

@@ -1,6 +1,7 @@
 # AGENTS.md — StockPilot AI (read fully before EVERY task)
 
 ## Operating rules
+
 1. Read `docs/REPO_MAP.md` before starting (except P00). Placeholders `<CLIENT_DIR>`, `<SERVER_DIR>`, `<STATS_DIR>` resolve there.
 2. Do exactly the task in the prompt. No extra features, refactors, renames, or dependencies beyond those listed.
 3. **NO TESTS.** Never create test files, test configs, mocks, fixtures, or add test dependencies (vitest, jest, pytest, supertest, etc.). Verification = typecheck/build + the manual commands listed in the prompt.
@@ -17,6 +18,7 @@
 14. Every prompt ends with a **FINAL REPORT** containing: Files created · Files modified · Commands run with their outputs (typecheck/build) · Manual verification results · Deviations/open issues.
 
 ## Conventions
+
 - API base path: `/api/v1`. Success envelope: `{ "data": <payload>, "meta"?: <object> }`. Error envelope: `{ "error": { "code": <ErrorCode>, "message": <string>, "details"?: <unknown>, "requestId": <string> } }`.
 - Node-owned JSON fields: camelCase. Python-originated payloads (forecast/evaluate/optimize/simulate results) are stored and returned **unchanged in snake_case**. Never convert case.
 - Dates: `YYYY-MM-DD` (UTC calendar dates, no timezone). Timestamps: ISO-8601 UTC with `Z`.

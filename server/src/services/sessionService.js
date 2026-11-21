@@ -21,49 +21,83 @@ export function toSessionDto(doc) {
     stages: {
       dataset: {
         status: d.stages?.dataset?.status ?? "not_started",
-        startedAt: d.stages?.dataset?.startedAt ? d.stages.dataset.startedAt.toISOString() : null,
-        finishedAt: d.stages?.dataset?.finishedAt ? d.stages.dataset.finishedAt.toISOString() : null,
+        startedAt: d.stages?.dataset?.startedAt
+          ? d.stages.dataset.startedAt.toISOString()
+          : null,
+        finishedAt: d.stages?.dataset?.finishedAt
+          ? d.stages.dataset.finishedAt.toISOString()
+          : null,
         errorCode: d.stages?.dataset?.errorCode ?? null,
         userMessage: d.stages?.dataset?.userMessage ?? null,
         retryable: d.stages?.dataset?.retryable ?? false,
-        lastJobId: d.stages?.dataset?.lastJobId ? d.stages.dataset.lastJobId.toString() : null,
+        lastJobId: d.stages?.dataset?.lastJobId
+          ? d.stages.dataset.lastJobId.toString()
+          : null,
       },
       forecast: {
         status: d.stages?.forecast?.status ?? "not_started",
-        startedAt: d.stages?.forecast?.startedAt ? d.stages.forecast.startedAt.toISOString() : null,
-        finishedAt: d.stages?.forecast?.finishedAt ? d.stages.forecast.finishedAt.toISOString() : null,
+        startedAt: d.stages?.forecast?.startedAt
+          ? d.stages.forecast.startedAt.toISOString()
+          : null,
+        finishedAt: d.stages?.forecast?.finishedAt
+          ? d.stages.forecast.finishedAt.toISOString()
+          : null,
         errorCode: d.stages?.forecast?.errorCode ?? null,
         userMessage: d.stages?.forecast?.userMessage ?? null,
         retryable: d.stages?.forecast?.retryable ?? false,
-        lastJobId: d.stages?.forecast?.lastJobId ? d.stages.forecast.lastJobId.toString() : null,
+        lastJobId: d.stages?.forecast?.lastJobId
+          ? d.stages.forecast.lastJobId.toString()
+          : null,
       },
       optimization: {
         status: d.stages?.optimization?.status ?? "not_started",
-        startedAt: d.stages?.optimization?.startedAt ? d.stages.optimization.startedAt.toISOString() : null,
-        finishedAt: d.stages?.optimization?.finishedAt ? d.stages.optimization.finishedAt.toISOString() : null,
+        startedAt: d.stages?.optimization?.startedAt
+          ? d.stages.optimization.startedAt.toISOString()
+          : null,
+        finishedAt: d.stages?.optimization?.finishedAt
+          ? d.stages.optimization.finishedAt.toISOString()
+          : null,
         errorCode: d.stages?.optimization?.errorCode ?? null,
         userMessage: d.stages?.optimization?.userMessage ?? null,
         retryable: d.stages?.optimization?.retryable ?? false,
-        lastJobId: d.stages?.optimization?.lastJobId ? d.stages.optimization.lastJobId.toString() : null,
+        lastJobId: d.stages?.optimization?.lastJobId
+          ? d.stages.optimization.lastJobId.toString()
+          : null,
       },
       simulation: {
         status: d.stages?.simulation?.status ?? "not_started",
-        startedAt: d.stages?.simulation?.startedAt ? d.stages.simulation.startedAt.toISOString() : null,
-        finishedAt: d.stages?.simulation?.finishedAt ? d.stages.simulation.finishedAt.toISOString() : null,
+        startedAt: d.stages?.simulation?.startedAt
+          ? d.stages.simulation.startedAt.toISOString()
+          : null,
+        finishedAt: d.stages?.simulation?.finishedAt
+          ? d.stages.simulation.finishedAt.toISOString()
+          : null,
         errorCode: d.stages?.simulation?.errorCode ?? null,
         userMessage: d.stages?.simulation?.userMessage ?? null,
         retryable: d.stages?.simulation?.retryable ?? false,
-        lastJobId: d.stages?.simulation?.lastJobId ? d.stages.simulation.lastJobId.toString() : null,
+        lastJobId: d.stages?.simulation?.lastJobId
+          ? d.stages.simulation.lastJobId.toString()
+          : null,
       },
     },
     activeDatasetId: d.activeDatasetId ? d.activeDatasetId.toString() : null,
-    activeForecastRunId: d.activeForecastRunId ? d.activeForecastRunId.toString() : null,
-    activeAssumptionSetId: d.activeAssumptionSetId ? d.activeAssumptionSetId.toString() : null,
-    activeOptimizationRunId: d.activeOptimizationRunId ? d.activeOptimizationRunId.toString() : null,
-    activeSimulationRunId: d.activeSimulationRunId ? d.activeSimulationRunId.toString() : null,
+    activeForecastRunId: d.activeForecastRunId
+      ? d.activeForecastRunId.toString()
+      : null,
+    activeAssumptionSetId: d.activeAssumptionSetId
+      ? d.activeAssumptionSetId.toString()
+      : null,
+    activeOptimizationRunId: d.activeOptimizationRunId
+      ? d.activeOptimizationRunId.toString()
+      : null,
+    activeSimulationRunId: d.activeSimulationRunId
+      ? d.activeSimulationRunId.toString()
+      : null,
     aiIndex: {
       status: d.aiIndex?.status ?? "not_indexed",
-      updatedAt: d.aiIndex?.updatedAt ? d.aiIndex.updatedAt.toISOString() : null,
+      updatedAt: d.aiIndex?.updatedAt
+        ? d.aiIndex.updatedAt.toISOString()
+        : null,
     },
     archivedAt: d.archivedAt ? d.archivedAt.toISOString() : null,
     completedAt: d.completedAt ? d.completedAt.toISOString() : null,
@@ -92,7 +126,10 @@ export async function createSession(userId, name) {
   return session;
 }
 
-export async function listSessions(userId, { page = 1, limit = 20, archived = false } = {}) {
+export async function listSessions(
+  userId,
+  { page = 1, limit = 20, archived = false } = {},
+) {
   const query = { userId };
   if (archived) {
     query.archivedAt = { $ne: null };
@@ -112,7 +149,10 @@ export async function listSessions(userId, { page = 1, limit = 20, archived = fa
 }
 
 export async function getSessionOwned(userId, sessionId) {
-  const session = await AnalysisSessionModel.findOne({ _id: sessionId, userId });
+  const session = await AnalysisSessionModel.findOne({
+    _id: sessionId,
+    userId,
+  });
   if (!session) {
     throw new AppError("NOT_FOUND", "Analysis session not found");
   }

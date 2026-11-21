@@ -1,5 +1,11 @@
-import { useState } from "react";
-import { Link, Outlet, useLocation, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import {
+  Link,
+  Outlet,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
 import { Check, ChevronRight, Edit2, Loader2, Sparkles } from "lucide-react";
 import { StatusBadge } from "../../components/StatusBadge.jsx";
 import { useGetSessionQuery, usePatchSessionMutation } from "../../lib/api.js";
@@ -22,12 +28,25 @@ export default function SessionLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const { data: session, isLoading, error, refetch } = useGetSessionQuery(sessionId, {
-    pollingInterval: (session) => {
-      const s = session?.status;
-      return ["validating", "forecasting", "optimizing", "simulating"].includes(s) ? 5000 : 0;
-    },
-  });
+  const {
+    data: session,
+    isLoading,
+    error,
+    refetch,
+  } = useGetSessionQuery(sessionId);
+
+  const isProcessing = [
+    "validating",
+    "forecasting",
+    "optimizing",
+    "simulating",
+  ].includes(session?.status);
+
+  useEffect(() => {
+    if (!isProcessing) return;
+    const interval = setInterval(refetch, 5000);
+    return () => clearInterval(interval);
+  }, [isProcessing, refetch]);
 
   const [patchSession] = usePatchSessionMutation();
   const [isEditingName, setIsEditingName] = useState(false);
@@ -95,7 +114,10 @@ export default function SessionLayout() {
                 onBlur={handleRename}
                 className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-sm text-slate-100 focus:outline-none focus:border-indigo-500"
               />
-              <button type="submit" className="text-xs text-indigo-400 font-medium">
+              <button
+                type="submit"
+                className="text-xs text-indigo-400 font-medium"
+              >
                 Save
               </button>
             </form>
@@ -159,7 +181,10 @@ export default function SessionLayout() {
 
       {/* Stepper Navigation */}
       <div className="border-b border-white/[0.06] bg-[#0d0f14]/80 px-6 py-3">
-        <nav aria-label="Pipeline Stages" className="flex items-center gap-2 overflow-x-auto">
+        <nav
+          aria-label="Pipeline Stages"
+          className="flex items-center gap-2 overflow-x-auto"
+        >
           {STEPS.map((stepKey, idx) => {
             const isClickable = idx <= maxIdx;
             const isCurrent = activeSubpage === stepKey;
@@ -177,8 +202,8 @@ export default function SessionLayout() {
                     isCurrent
                       ? "bg-indigo-600/20 border border-indigo-500/30 text-indigo-200"
                       : isClickable
-                      ? "text-slate-300 hover:bg-slate-800/60"
-                      : "text-slate-600 cursor-not-allowed"
+                        ? "text-slate-300 hover:bg-slate-800/60"
+                        : "text-slate-600 cursor-not-allowed"
                   }`}
                 >
                   <span
@@ -186,8 +211,8 @@ export default function SessionLayout() {
                       isCompleted
                         ? "bg-emerald-500/20 text-emerald-400"
                         : isCurrent
-                        ? "bg-indigo-500 text-white"
-                        : "bg-slate-800 text-slate-500"
+                          ? "bg-indigo-500 text-white"
+                          : "bg-slate-800 text-slate-500"
                     }`}
                   >
                     {isCompleted ? <Check size={10} /> : idx + 1}

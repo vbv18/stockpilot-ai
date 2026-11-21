@@ -88,7 +88,10 @@ registerJobHandler("optimization", {
 
     const okSkus = optimizeResponse.skus.filter((s) => s.status === "ok");
     if (okSkus.length === 0) {
-      throw new AppError("NO_ELIGIBLE_SKUS", "No SKU has positive forecast demand for this lead time.");
+      throw new AppError(
+        "NO_ELIGIBLE_SKUS",
+        "No SKU has positive forecast demand for this lead time.",
+      );
     }
 
     optRun.status = "succeeded";
@@ -114,7 +117,9 @@ registerJobHandler("optimization", {
 
     scheduleReindex(ctx.userId, ctx.sessionId, "optimization");
 
-    return { resultRef: { collection: "optimization_runs", id: optRun._id.toString() } };
+    return {
+      resultRef: { collection: "optimization_runs", id: optRun._id.toString() },
+    };
   },
 
   async onFailed(ctx, failure) {
@@ -128,7 +133,9 @@ registerJobHandler("optimization", {
         },
       },
     );
-    await transition(ctx.userId, ctx.sessionId, "optimization_failed").catch(() => {});
+    await transition(ctx.userId, ctx.sessionId, "optimization_failed").catch(
+      () => {},
+    );
     await setStage(ctx.userId, ctx.sessionId, "optimization", {
       status: "failed",
       errorCode: failure.code,
@@ -142,7 +149,9 @@ registerJobHandler("optimization", {
       { jobId: ctx.jobId, userId: ctx.userId },
       { $set: { status: "cancelled" } },
     );
-    await transition(ctx.userId, ctx.sessionId, "assumptions_pending").catch(() => {});
+    await transition(ctx.userId, ctx.sessionId, "assumptions_pending").catch(
+      () => {},
+    );
     await setStage(ctx.userId, ctx.sessionId, "optimization", {
       status: "cancelled",
     });

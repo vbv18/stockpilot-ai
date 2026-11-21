@@ -1,4 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate, useParams } from "react-router-dom";
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useParams,
+} from "react-router-dom";
 import { useSelector } from "react-redux";
 import Login from "./pages/LoginPage.jsx";
 import Home from "./pages/Home.jsx";
@@ -52,12 +58,16 @@ export default function App() {
 
           <Route
             path="/sessions"
-            element={userData ? <SessionsPage /> : <Navigate to="/login" replace />}
+            element={
+              userData ? <SessionsPage /> : <Navigate to="/login" replace />
+            }
           />
 
           <Route
             path="/sessions/:sessionId"
-            element={userData ? <SessionLayout /> : <Navigate to="/login" replace />}
+            element={
+              userData ? <SessionLayout /> : <Navigate to="/login" replace />
+            }
           >
             <Route index element={<SessionIndexRedirect />} />
             <Route path="overview" element={<OverviewPage />} />
@@ -71,11 +81,15 @@ export default function App() {
 
           <Route
             path="/ask-ai"
-            element={userData ? <AskAiPage /> : <Navigate to="/login" replace />}
+            element={
+              userData ? <AskAiPage /> : <Navigate to="/login" replace />
+            }
           />
           <Route
             path="/ask-ai/:conversationId"
-            element={userData ? <AskAiPage /> : <Navigate to="/login" replace />}
+            element={
+              userData ? <AskAiPage /> : <Navigate to="/login" replace />
+            }
           />
 
           {/* Fallback 404 Route for deep links and unhandled URLs */}
@@ -85,4 +99,3 @@ export default function App() {
     </ErrorBoundary>
   );
 }
-

@@ -42,13 +42,13 @@ export const stockpilotApi = createApi({
         method: "GET",
       }),
       providesTags: (result) =>
-        result
+        result?.data
           ? [
-              ...result.map(({ id }) => ({ type: "Session", id })),
+              ...result.data.map(({ id }) => ({ type: "Session", id })),
               { type: "Sessions", id: "LIST" },
             ]
           : [{ type: "Sessions", id: "LIST" }],
-      transformResponse: (response) => {
+      transformResponse: (response, meta, arg) => {
         // Return both items and meta if available
         return response;
       },
@@ -235,7 +235,9 @@ export const stockpilotApi = createApi({
         url: `/sessions/${id}/simulations/${simulationId}`,
         method: "GET",
       }),
-      providesTags: (result, error, { simulationId }) => [{ type: "Simulation", id: simulationId }],
+      providesTags: (result, error, { simulationId }) => [
+        { type: "Simulation", id: simulationId },
+      ],
     }),
 
     // AI endpoints
@@ -302,11 +304,15 @@ export const stockpilotApi = createApi({
           const { data } = await queryFulfilled;
           if (data?.userMessage && data?.assistantMessage) {
             dispatch(
-              stockpilotApi.util.updateQueryData("listMessages", { id, page: 1, limit: 50 }, (draft) => {
-                if (Array.isArray(draft)) {
-                  draft.push(data.userMessage, data.assistantMessage);
-                }
-              }),
+              stockpilotApi.util.updateQueryData(
+                "listMessages",
+                { id, page: 1, limit: 50 },
+                (draft) => {
+                  if (Array.isArray(draft)) {
+                    draft.push(data.userMessage, data.assistantMessage);
+                  }
+                },
+              ),
             );
           }
         } catch {

@@ -6,10 +6,18 @@ import { AppError } from "../../lib/errors.js";
 import { validate, getValidated } from "../../middlewares/validate.js";
 import { DatasetModel } from "../../models/dataset.model.js";
 import { ForecastRunModel } from "../../models/forecastRun.model.js";
-import { getActiveForecastRun, stripForClient } from "../../services/forecastAccess.js";
+import {
+  getActiveForecastRun,
+  stripForClient,
+} from "../../services/forecastAccess.js";
 import { enqueueJob } from "../../services/jobRunner.js";
 import { loadProcessedSeries } from "../../services/processedSeries.js";
-import { getSessionOwned, requireStatus, setStage, transition } from "../../services/sessionService.js";
+import {
+  getSessionOwned,
+  requireStatus,
+  setStage,
+  transition,
+} from "../../services/sessionService.js";
 import { ACTION_ALLOWED_FROM } from "../../services/stateMachine.js";
 
 const router = Router({ mergeParams: true });
@@ -36,7 +44,10 @@ router.post(
         sessionId: params.sessionId,
       });
       if (!dataset || dataset.status !== "ready") {
-        throw new AppError("INVALID_STATE", "Active dataset must be in 'ready' status to start forecasting.");
+        throw new AppError(
+          "INVALID_STATE",
+          "Active dataset must be in 'ready' status to start forecasting.",
+        );
       }
 
       const seed = body.seed ?? crypto.randomInt(0, 2147483647);
@@ -73,64 +84,66 @@ router.post(
 );
 
 // GET /sessions/:sessionId/forecast
-router.get(
-  "/",
-  validate({ params: IdParam }),
-  async (req, res, next) => {
-    try {
-      const user = getUser(res);
-      const { params } = getValidated(res);
-      const session = await getSessionOwned(user.userId, params.sessionId);
+router.get("/", validate({ params: IdParam }), async (req, res, next) => {
+  try {
+    const user = getUser(res);
+    const { params } = getValidated(res);
+    const session = await getSessionOwned(user.userId, params.sessionId);
 
-      if (!session.activeForecastRunId) {
-        throw new AppError("NOT_FOUND", "No active forecast run found for session");
-      }
-
-      const run = await ForecastRunModel.findOne({
-        _id: session.activeForecastRunId,
-        userId: user.userId,
-        sessionId: params.sessionId,
-      });
-      if (!run) {
-        throw new AppError("NOT_FOUND", "Forecast run not found");
-      }
-
-      let history = [];
-      if (session.activeDatasetId) {
-        history = await loadProcessedSeries(user.userId, session.activeDatasetId.toString()).catch(() => []);
-      }
-
-      const fullForecast = run.result?.forecast || null;
-      const strippedForecast = stripForClient(fullForecast);
-      const evaluation = run.result?.evaluation || null;
-
-      const eligibleSkuIds = (fullForecast?.skus || [])
-        .filter((s) => s.status === "ok" && s.interval_status === "ok")
-        .map((s) => s.sku_id);
-
-      return res.status(200).json({
-        data: {
-          run: {
-            id: run._id.toString(),
-            status: run.status,
-            createdAt: run.createdAt ? run.createdAt.toISOString() : null,
-            updatedAt: run.updatedAt ? run.updatedAt.toISOString() : null,
-            seed: run.seed,
-            modelConfig: run.modelConfig,
-            evaluationConfig: run.evaluationConfig,
-            runMeta: run.runMeta,
-            error: run.error?.code ? run.error : null,
-          },
-          history,
-          forecast: strippedForecast,
-          evaluation,
-          eligibleSkuIds,
-        },
-      });
-    } catch (err) {
-      next(err);
+    if (!session.activeForecastRunId) {
+      throw new AppError(
+        "NOT_FOUND",
+        "No active forecast run found for session",
+      );
     }
-  },
-);
+
+    const run = await ForecastRunModel.findOne({
+      _id: session.activeForecastRunId,
+      userId: user.userId,
+      sessionId: params.sessionId,
+    });
+    if (!run) {
+      throw new AppError("NOT_FOUND", "Forecast run not found");
+    }
+
+    let history = [];
+    if (session.activeDatasetId) {
+      history = await loadProcessedSeries(
+        user.userId,
+        session.activeDatasetId.toString(),
+      ).catch(() => []);
+    }
+
+    const fullForecast = run.result?.forecast || null;
+    const strippedForecast = stripForClient(fullForecast);
+    const evaluation = run.result?.evaluation || null;
+
+    const eligibleSkuIds = (fullForecast?.skus || [])
+      .filter((s) => s.status === "ok" && s.interval_status === "ok")
+      .map((s) => s.sku_id);
+
+    return res.status(200).json({
+      data: {
+        run: {
+          id: run._id.toString(),
+          status: run.status,
+          createdAt: run.createdAt ? run.createdAt.toISOString() : null,
+          updatedAt: run.updatedAt ? run.updatedAt.toISOString() : null,
+          seed: run.seed,
+          modelConfig: run.modelConfig,
+          evaluationConfig: run.evaluationConfig,
+          runMeta: run.runMeta,
+          error: run.error?.code ? run.error : null,
+        },
+        history,
+        forecast: strippedForecast,
+        evaluation,
+        eligibleSkuIds,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;

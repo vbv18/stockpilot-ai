@@ -17,7 +17,11 @@ export function useJobTracker(sessionId, jobId, onFinished) {
   const isActive = job?.status === "queued" || job?.status === "running";
 
   useEffect(() => {
-    if (jobId && job && ["succeeded", "failed", "cancelled"].includes(job.status)) {
+    if (
+      jobId &&
+      job &&
+      ["succeeded", "failed", "cancelled"].includes(job.status)
+    ) {
       if (!finishedRef.current) {
         finishedRef.current = true;
         // Invalidate tags

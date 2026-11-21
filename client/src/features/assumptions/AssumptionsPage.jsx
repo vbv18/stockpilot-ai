@@ -1,9 +1,21 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { AlertCircle, ArrowRight, ChevronDown, ChevronUp, History, Info, Loader2 } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
+  History,
+  Info,
+  Loader2,
+} from "lucide-react";
 import { COPY } from "../../lib/copy.js";
 import { fmtDateTime, fmtInr, fmtPct } from "../../lib/format.js";
-import { useCreateAssumptionsMutation, useGetAssumptionDefaultsQuery, useListAssumptionsQuery } from "../../lib/api.js";
+import {
+  useCreateAssumptionsMutation,
+  useGetAssumptionDefaultsQuery,
+  useListAssumptionsQuery,
+} from "../../lib/api.js";
 import { assumptionsFormSchema } from "./schema.js";
 
 export default function AssumptionsPage() {
@@ -12,17 +24,22 @@ export default function AssumptionsPage() {
 
   const { data: defaultsData } = useGetAssumptionDefaultsQuery(session.id);
   const { data: versionsList = [] } = useListAssumptionsQuery(session.id);
-  const [createAssumptions, { isLoading: isSubmitting }] = useCreateAssumptionsMutation();
+  const [createAssumptions, { isLoading: isSubmitting }] =
+    useCreateAssumptionsMutation();
 
   const latestVersion = versionsList.length > 0 ? versionsList[0] : null;
-  const defaults = useMemo(() => defaultsData?.values || {
-    orderingCost: 200,
-    holdingCost: 5,
-    holdingCostUnit: "per_unit_per_day",
-    shortagePenalty: 50,
-    leadTimeDays: 7,
-    targetServiceLevel: 0.95,
-  }, [defaultsData]);
+  const defaults = useMemo(
+    () =>
+      defaultsData?.values || {
+        orderingCost: 200,
+        holdingCost: 5,
+        holdingCostUnit: "per_unit_per_day",
+        shortagePenalty: 50,
+        leadTimeDays: 7,
+        targetServiceLevel: 0.95,
+      },
+    [defaultsData],
+  );
 
   // Form inputs state
   const [orderingCost, setOrderingCost] = useState(200);
@@ -48,7 +65,9 @@ export default function AssumptionsPage() {
     setHoldingCostUnit(src.holdingCostUnit ?? "per_unit_per_day");
     setShortagePenalty(src.shortagePenalty ?? 50);
     setLeadTimeDays(src.leadTimeDays ?? 7);
-    setTargetServiceLevelPct(src.targetServiceLevel ? src.targetServiceLevel * 100 : 95);
+    setTargetServiceLevelPct(
+      src.targetServiceLevel ? src.targetServiceLevel * 100 : 95,
+    );
     setInitializedKey(currentKey);
   }
 
@@ -104,7 +123,9 @@ export default function AssumptionsPage() {
 
       navigate(`/sessions/${session.id}/optimization`);
     } catch (err) {
-      setSubmitError(err.data?.message || err.message || "Failed to save assumptions.");
+      setSubmitError(
+        err.data?.message || err.message || "Failed to save assumptions.",
+      );
     }
   };
 
@@ -120,9 +141,12 @@ export default function AssumptionsPage() {
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
       <div>
-        <h2 className="text-xl font-bold text-white tracking-tight">Inventory Optimization Assumptions</h2>
+        <h2 className="text-xl font-bold text-white tracking-tight">
+          Inventory Optimization Assumptions
+        </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Specify holding costs, fixed ordering fees, supplier lead times, and desired service level to compute safety stocks.
+          Specify holding costs, fixed ordering fees, supplier lead times, and
+          desired service level to compute safety stocks.
         </p>
       </div>
 
@@ -140,7 +164,10 @@ export default function AssumptionsPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-6 flex flex-col gap-6 shadow-xl">
+      <form
+        onSubmit={handleSubmit}
+        className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-6 flex flex-col gap-6 shadow-xl"
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* Ordering Cost */}
           <div className="flex flex-col gap-1.5">
@@ -148,12 +175,18 @@ export default function AssumptionsPage() {
               <label className="text-xs font-medium text-slate-300">
                 Ordering Cost (S) <span className="text-rose-400">*</span>
               </label>
-              <span className={`text-[10px] px-2 py-0.5 rounded font-mono ${orderingCost === defaults.orderingCost ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-indigo-500/10 text-indigo-300"}`}>
-                {orderingCost === defaults.orderingCost ? "Demo default" : "Your value"}
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded font-mono ${orderingCost === defaults.orderingCost ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-indigo-500/10 text-indigo-300"}`}
+              >
+                {orderingCost === defaults.orderingCost
+                  ? "Demo default"
+                  : "Your value"}
               </span>
             </div>
             <div className="relative">
-              <span className="absolute left-3 top-2 text-xs text-slate-500">₹</span>
+              <span className="absolute left-3 top-2 text-xs text-slate-500">
+                ₹
+              </span>
               <input
                 type="number"
                 step="any"
@@ -163,8 +196,14 @@ export default function AssumptionsPage() {
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-7 pr-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
               />
             </div>
-            <span className="text-[11px] text-slate-500">Fixed administrative fee incurred per replenishment order placed.</span>
-            {errors.orderingCost && <span className="text-xs text-rose-400">{errors.orderingCost}</span>}
+            <span className="text-[11px] text-slate-500">
+              Fixed administrative fee incurred per replenishment order placed.
+            </span>
+            {errors.orderingCost && (
+              <span className="text-xs text-rose-400">
+                {errors.orderingCost}
+              </span>
+            )}
           </div>
 
           {/* Holding Cost */}
@@ -173,13 +212,19 @@ export default function AssumptionsPage() {
               <label className="text-xs font-medium text-slate-300">
                 Holding Cost (H) <span className="text-rose-400">*</span>
               </label>
-              <span className={`text-[10px] px-2 py-0.5 rounded font-mono ${holdingCost === defaults.holdingCost ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-indigo-500/10 text-indigo-300"}`}>
-                {holdingCost === defaults.holdingCost ? "Demo default" : "Your value"}
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded font-mono ${holdingCost === defaults.holdingCost ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-indigo-500/10 text-indigo-300"}`}
+              >
+                {holdingCost === defaults.holdingCost
+                  ? "Demo default"
+                  : "Your value"}
               </span>
             </div>
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <span className="absolute left-3 top-2 text-xs text-slate-500">₹</span>
+                <span className="absolute left-3 top-2 text-xs text-slate-500">
+                  ₹
+                </span>
                 <input
                   type="number"
                   step="any"
@@ -198,8 +243,14 @@ export default function AssumptionsPage() {
                 <option value="per_unit_per_year">per unit / year</option>
               </select>
             </div>
-            <span className="text-[11px] text-slate-500">Converted to a yearly figure for EOQ (daily x 365).</span>
-            {errors.holdingCost && <span className="text-xs text-rose-400">{errors.holdingCost}</span>}
+            <span className="text-[11px] text-slate-500">
+              Converted to a yearly figure for EOQ (daily x 365).
+            </span>
+            {errors.holdingCost && (
+              <span className="text-xs text-rose-400">
+                {errors.holdingCost}
+              </span>
+            )}
           </div>
 
           {/* Shortage Penalty */}
@@ -208,12 +259,18 @@ export default function AssumptionsPage() {
               <label className="text-xs font-medium text-slate-300">
                 Shortage Penalty <span className="text-rose-400">*</span>
               </label>
-              <span className={`text-[10px] px-2 py-0.5 rounded font-mono ${shortagePenalty === defaults.shortagePenalty ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-indigo-500/10 text-indigo-300"}`}>
-                {shortagePenalty === defaults.shortagePenalty ? "Demo default" : "Your value"}
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded font-mono ${shortagePenalty === defaults.shortagePenalty ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-indigo-500/10 text-indigo-300"}`}
+              >
+                {shortagePenalty === defaults.shortagePenalty
+                  ? "Demo default"
+                  : "Your value"}
               </span>
             </div>
             <div className="relative">
-              <span className="absolute left-3 top-2 text-xs text-slate-500">₹</span>
+              <span className="absolute left-3 top-2 text-xs text-slate-500">
+                ₹
+              </span>
               <input
                 type="number"
                 step="any"
@@ -223,18 +280,30 @@ export default function AssumptionsPage() {
                 className="w-full bg-slate-900 border border-slate-700 rounded-xl pl-7 pr-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
               />
             </div>
-            <span className="text-[11px] text-slate-500">Estimated lost margin or penalty per unit of unmet customer demand.</span>
-            {errors.shortagePenalty && <span className="text-xs text-rose-400">{errors.shortagePenalty}</span>}
+            <span className="text-[11px] text-slate-500">
+              Estimated lost margin or penalty per unit of unmet customer
+              demand.
+            </span>
+            {errors.shortagePenalty && (
+              <span className="text-xs text-rose-400">
+                {errors.shortagePenalty}
+              </span>
+            )}
           </div>
 
           {/* Supplier Lead Time */}
           <div className="flex flex-col gap-1.5">
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium text-slate-300">
-                Supplier Lead Time (Days) <span className="text-rose-400">*</span>
+                Supplier Lead Time (Days){" "}
+                <span className="text-rose-400">*</span>
               </label>
-              <span className={`text-[10px] px-2 py-0.5 rounded font-mono ${leadTimeDays === defaults.leadTimeDays ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-indigo-500/10 text-indigo-300"}`}>
-                {leadTimeDays === defaults.leadTimeDays ? "Demo default" : "Your value"}
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded font-mono ${leadTimeDays === defaults.leadTimeDays ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-indigo-500/10 text-indigo-300"}`}
+              >
+                {leadTimeDays === defaults.leadTimeDays
+                  ? "Demo default"
+                  : "Your value"}
               </span>
             </div>
             <input
@@ -246,18 +315,29 @@ export default function AssumptionsPage() {
               onBlur={validateForm}
               className="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500"
             />
-            <span className="text-[11px] text-slate-500">Days between order placement and receipt (max 28 days).</span>
-            {errors.leadTimeDays && <span className="text-xs text-rose-400">{errors.leadTimeDays}</span>}
+            <span className="text-[11px] text-slate-500">
+              Days between order placement and receipt (max 28 days).
+            </span>
+            {errors.leadTimeDays && (
+              <span className="text-xs text-rose-400">
+                {errors.leadTimeDays}
+              </span>
+            )}
           </div>
 
           {/* Target Service Level */}
           <div className="flex flex-col gap-1.5 md:col-span-2">
             <div className="flex items-center justify-between">
               <label className="text-xs font-medium text-slate-300">
-                Target Cycle Service Level (%) <span className="text-rose-400">*</span>
+                Target Cycle Service Level (%){" "}
+                <span className="text-rose-400">*</span>
               </label>
-              <span className={`text-[10px] px-2 py-0.5 rounded font-mono ${targetServiceLevelPct === defaults.targetServiceLevel * 100 ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-indigo-500/10 text-indigo-300"}`}>
-                {targetServiceLevelPct === defaults.targetServiceLevel * 100 ? "Demo default" : "Your value"}
+              <span
+                className={`text-[10px] px-2 py-0.5 rounded font-mono ${targetServiceLevelPct === defaults.targetServiceLevel * 100 ? "bg-amber-500/10 text-amber-300 border border-amber-500/20" : "bg-indigo-500/10 text-indigo-300"}`}
+              >
+                {targetServiceLevelPct === defaults.targetServiceLevel * 100
+                  ? "Demo default"
+                  : "Your value"}
               </span>
             </div>
             <div className="flex items-center gap-3">
@@ -271,9 +351,16 @@ export default function AssumptionsPage() {
                 onBlur={validateForm}
                 className="w-32 bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
               />
-              <span className="text-xs text-slate-400">% cycle service level (e.g. 95% = 5% tolerance for stockout risk)</span>
+              <span className="text-xs text-slate-400">
+                % cycle service level (e.g. 95% = 5% tolerance for stockout
+                risk)
+              </span>
             </div>
-            {errors.targetServiceLevelPct && <span className="text-xs text-rose-400">{errors.targetServiceLevelPct}</span>}
+            {errors.targetServiceLevelPct && (
+              <span className="text-xs text-rose-400">
+                {errors.targetServiceLevelPct}
+              </span>
+            )}
           </div>
         </div>
 
@@ -294,7 +381,9 @@ export default function AssumptionsPage() {
             disabled={!confirmed || isSubmitting}
             className="self-end flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-semibold text-white shadow-md shadow-indigo-700/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
           >
-            {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : null}
+            {isSubmitting ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : null}
             <span>Save and Continue</span>
             <ArrowRight size={14} />
           </button>
@@ -319,12 +408,22 @@ export default function AssumptionsPage() {
           {showHistory && (
             <div className="divide-y divide-white/[0.04] mt-2">
               {versionsList.map((v) => (
-                <div key={v.id} className="py-3 flex items-center justify-between text-xs">
+                <div
+                  key={v.id}
+                  className="py-3 flex items-center justify-between text-xs"
+                >
                   <div>
-                    <span className="font-semibold text-slate-200">Version {v.version}</span>
-                    <span className="text-slate-500 ml-2">Confirmed {fmtDateTime(v.confirmedAt)}</span>
+                    <span className="font-semibold text-slate-200">
+                      Version {v.version}
+                    </span>
+                    <span className="text-slate-500 ml-2">
+                      Confirmed {fmtDateTime(v.confirmedAt)}
+                    </span>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      S={fmtInr(v.orderingCost)} · H={fmtInr(v.holdingCost)} ({v.holdingCostUnit.replace(/_/g, " ")}) · Lead={v.leadTimeDays}d · Service={fmtPct(v.targetServiceLevel, 0)}
+                      S={fmtInr(v.orderingCost)} · H={fmtInr(v.holdingCost)} (
+                      {v.holdingCostUnit.replace(/_/g, " ")}) · Lead=
+                      {v.leadTimeDays}d · Service=
+                      {fmtPct(v.targetServiceLevel, 0)}
                     </p>
                   </div>
                   <button

@@ -12,7 +12,13 @@ import {
 } from "recharts";
 import { ChevronDown, ChevronUp, History, Loader2, Play } from "lucide-react";
 import { COPY } from "../../lib/copy.js";
-import { fmtDateTime, fmtInr, fmtNum, fmtPct, shortId } from "../../lib/format.js";
+import {
+  fmtDateTime,
+  fmtInr,
+  fmtNum,
+  fmtPct,
+  shortId,
+} from "../../lib/format.js";
 import {
   useGetOptimizationQuery,
   useGetSimulationQuery,
@@ -26,10 +32,13 @@ export default function SimulationPage() {
   const { session } = useOutletContext();
 
   const { data: optData } = useGetOptimizationQuery(session.id);
-  const { data: runsList = [], refetch: refetchList } = useListSimulationsQuery(session.id);
+  const { data: runsList = [], refetch: refetchList } = useListSimulationsQuery(
+    session.id,
+  );
 
   const [selectedRunId, setSelectedRunId] = useState(null);
-  const activeRunId = selectedRunId || (runsList.length > 0 ? runsList[0].id : null);
+  const activeRunId =
+    selectedRunId || (runsList.length > 0 ? runsList[0].id : null);
 
   const { data: simData } = useGetSimulationQuery(
     { id: session.id, simulationId: activeRunId },
@@ -49,7 +58,8 @@ export default function SimulationPage() {
     }
   });
 
-  const [startSimulation, { isLoading: isStarting }] = useStartSimulationMutation();
+  const [startSimulation, { isLoading: isStarting }] =
+    useStartSimulationMutation();
 
   // Run form parameters
   const [nScenarios, setNScenarios] = useState(500);
@@ -88,7 +98,9 @@ export default function SimulationPage() {
       setJobId(newJobId);
       sessionStorage.setItem(`sp:job:${session.id}:simulation`, newJobId);
     } catch (err) {
-      setFormError(err.data?.message || err.message || "Failed to start simulation.");
+      setFormError(
+        err.data?.message || err.message || "Failed to start simulation.",
+      );
     }
   };
 
@@ -130,20 +142,28 @@ export default function SimulationPage() {
   return (
     <div className="flex flex-col gap-6 max-w-6xl mx-auto">
       <div>
-        <h2 className="text-xl font-bold text-white tracking-tight">Monte Carlo Simulation Comparison</h2>
+        <h2 className="text-xl font-bold text-white tracking-tight">
+          Monte Carlo Simulation Comparison
+        </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Common random demand scenarios evaluated under daily-review (s, S) lost-sales inventory policies.
+          Common random demand scenarios evaluated under daily-review (s, S)
+          lost-sales inventory policies.
         </p>
       </div>
 
       {jobId && <JobProgress sessionId={session.id} job={job} />}
 
       {/* Parameter Controls & Run Bar */}
-      <form onSubmit={handleRunSimulation} className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
+      <form
+        onSubmit={handleRunSimulation}
+        className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col gap-4 shadow-xl"
+      >
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="flex flex-wrap items-center gap-4">
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-medium text-slate-400">Scenarios (100–2000)</label>
+              <label className="text-[11px] font-medium text-slate-400">
+                Scenarios (100–2000)
+              </label>
               <input
                 type="number"
                 min="100"
@@ -155,7 +175,9 @@ export default function SimulationPage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-medium text-slate-400">Horizon Days (30–180)</label>
+              <label className="text-[11px] font-medium text-slate-400">
+                Horizon Days (30–180)
+              </label>
               <input
                 type="number"
                 min="30"
@@ -167,7 +189,9 @@ export default function SimulationPage() {
             </div>
 
             <div className="flex flex-col gap-1">
-              <label className="text-[11px] font-medium text-slate-400">Random Seed (Optional)</label>
+              <label className="text-[11px] font-medium text-slate-400">
+                Random Seed (Optional)
+              </label>
               <input
                 type="number"
                 placeholder="random"
@@ -198,17 +222,35 @@ export default function SimulationPage() {
 
             <button
               type="submit"
-              disabled={isStaleOpt || isStarting || (job && (job.status === "queued" || job.status === "running"))}
-              title={isStaleOpt ? "Re-run optimization for the latest assumptions first." : ""}
+              disabled={
+                isStaleOpt ||
+                isStarting ||
+                (job && (job.status === "queued" || job.status === "running"))
+              }
+              title={
+                isStaleOpt
+                  ? "Re-run optimization for the latest assumptions first."
+                  : ""
+              }
               className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-semibold text-white shadow-md shadow-indigo-700/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
             >
-              {isStarting ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-              <span>{runsList.length > 0 ? "Run Another Simulation" : "Run Simulation"}</span>
+              {isStarting ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Play size={14} />
+              )}
+              <span>
+                {runsList.length > 0
+                  ? "Run Another Simulation"
+                  : "Run Simulation"}
+              </span>
             </button>
           </div>
         </div>
 
-        {formError && <span className="text-xs text-rose-400">{formError}</span>}
+        {formError && (
+          <span className="text-xs text-rose-400">{formError}</span>
+        )}
 
         {isStaleOpt && (
           <span className="text-xs text-amber-400">
@@ -228,68 +270,100 @@ export default function SimulationPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Deterministic Card */}
             <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col gap-3">
-              <span className="text-xs font-bold text-slate-300">Deterministic Policy (ROP_d)</span>
+              <span className="text-xs font-bold text-slate-300">
+                Deterministic Policy (ROP_d)
+              </span>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-slate-100">{fmtInr(detAgg?.total_cost)}</span>
+                <span className="text-2xl font-bold text-slate-100">
+                  {fmtInr(detAgg?.total_cost)}
+                </span>
                 <span className="text-xs text-slate-500">total cost</span>
               </div>
               <div className="flex flex-col gap-1.5 text-xs text-slate-400 pt-2 border-t border-white/[0.04]">
                 <div className="flex justify-between">
                   <span>Service Level (Fill Rate):</span>
-                  <span className="font-mono text-slate-200 font-semibold">{fmtPct(detAgg?.service_level, 2)}</span>
+                  <span className="font-mono text-slate-200 font-semibold">
+                    {fmtPct(detAgg?.service_level, 2)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Stockout Days Rate:</span>
-                  <span className="font-mono text-slate-200">{fmtPct(detAgg?.stockout_rate_mean, 1)}</span>
+                  <span className="font-mono text-slate-200">
+                    {fmtPct(detAgg?.stockout_rate_mean, 1)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Avg On-Hand Inventory:</span>
-                  <span className="font-mono text-slate-200">{fmtNum(detAgg?.avg_inventory, 1)} units</span>
+                  <span className="font-mono text-slate-200">
+                    {fmtNum(detAgg?.avg_inventory, 1)} units
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Replenishment Orders:</span>
-                  <span className="font-mono text-slate-200">{fmtNum(detAgg?.order_count, 1)}</span>
+                  <span className="font-mono text-slate-200">
+                    {fmtNum(detAgg?.order_count, 1)}
+                  </span>
                 </div>
               </div>
             </div>
 
             {/* Difference / Neutrality Card */}
             <div className="bg-[#13151c] border border-indigo-500/20 rounded-2xl p-5 flex flex-col justify-between gap-3 text-center">
-              <span className="text-xs font-semibold text-indigo-300">Cost Difference (Emp - Det)</span>
+              <span className="text-xs font-semibold text-indigo-300">
+                Cost Difference (Emp - Det)
+              </span>
               <div>
-                <span className={`text-2xl font-extrabold ${costDiff < 0 ? "text-emerald-400" : costDiff > 0 ? "text-rose-400" : "text-slate-300"}`}>
+                <span
+                  className={`text-2xl font-extrabold ${costDiff < 0 ? "text-emerald-400" : costDiff > 0 ? "text-rose-400" : "text-slate-300"}`}
+                >
                   {costDiff > 0 ? `+${fmtInr(costDiff)}` : fmtInr(costDiff)}
                 </span>
                 <p className="text-[11px] text-slate-400 mt-1">
-                  {costDiff < 0 ? "Uncertainty-aware saved money overall" : "Uncertainty-aware incurred higher costs"}
+                  {costDiff < 0
+                    ? "Uncertainty-aware saved money overall"
+                    : "Uncertainty-aware incurred higher costs"}
                 </p>
               </div>
-              <p className="text-[10px] text-slate-500 leading-normal">{COPY.noSuperiority}</p>
+              <p className="text-[10px] text-slate-500 leading-normal">
+                {COPY.noSuperiority}
+              </p>
             </div>
 
             {/* Uncertainty-Aware Card */}
             <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col gap-3">
-              <span className="text-xs font-bold text-emerald-400">Uncertainty-Aware Policy (ROP_u)</span>
+              <span className="text-xs font-bold text-emerald-400">
+                Uncertainty-Aware Policy (ROP_u)
+              </span>
               <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-bold text-emerald-300">{fmtInr(empAgg?.total_cost)}</span>
+                <span className="text-2xl font-bold text-emerald-300">
+                  {fmtInr(empAgg?.total_cost)}
+                </span>
                 <span className="text-xs text-slate-500">total cost</span>
               </div>
               <div className="flex flex-col gap-1.5 text-xs text-slate-400 pt-2 border-t border-white/[0.04]">
                 <div className="flex justify-between">
                   <span>Service Level (Fill Rate):</span>
-                  <span className="font-mono text-emerald-300 font-semibold">{fmtPct(empAgg?.service_level, 2)}</span>
+                  <span className="font-mono text-emerald-300 font-semibold">
+                    {fmtPct(empAgg?.service_level, 2)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Stockout Days Rate:</span>
-                  <span className="font-mono text-slate-200">{fmtPct(empAgg?.stockout_rate_mean, 1)}</span>
+                  <span className="font-mono text-slate-200">
+                    {fmtPct(empAgg?.stockout_rate_mean, 1)}
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Avg On-Hand Inventory:</span>
-                  <span className="font-mono text-slate-200">{fmtNum(empAgg?.avg_inventory, 1)} units</span>
+                  <span className="font-mono text-slate-200">
+                    {fmtNum(empAgg?.avg_inventory, 1)} units
+                  </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Replenishment Orders:</span>
-                  <span className="font-mono text-slate-200">{fmtNum(empAgg?.order_count, 1)}</span>
+                  <span className="font-mono text-slate-200">
+                    {fmtNum(empAgg?.order_count, 1)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -298,13 +372,26 @@ export default function SimulationPage() {
           {/* Charts: Cost Breakdown & Service Level */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col gap-3">
-              <span className="text-xs font-semibold text-slate-300">Cost Breakdown by Component (₹)</span>
+              <span className="text-xs font-semibold text-slate-300">
+                Cost Breakdown by Component (₹)
+              </span>
               <div className="h-60 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={costChartData} margin={{ top: 10, right: 10, left: 10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <BarChart
+                    data={costChartData}
+                    margin={{ top: 10, right: 10, left: 10, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#334155"
+                      opacity={0.3}
+                    />
                     <XAxis dataKey="policy" stroke="#64748b" fontSize={11} />
-                    <YAxis stroke="#64748b" fontSize={10} tickFormatter={(v) => `₹${v / 1000}k`} />
+                    <YAxis
+                      stroke="#64748b"
+                      fontSize={10}
+                      tickFormatter={(v) => `₹${v / 1000}k`}
+                    />
                     <Tooltip
                       formatter={(v) => fmtInr(v)}
                       contentStyle={{
@@ -324,13 +411,27 @@ export default function SimulationPage() {
             </div>
 
             <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col gap-3">
-              <span className="text-xs font-semibold text-slate-300">Fill Rate Comparison (%)</span>
+              <span className="text-xs font-semibold text-slate-300">
+                Fill Rate Comparison (%)
+              </span>
               <div className="h-60 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={slChartData} margin={{ top: 10, right: 10, left: -10, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+                  <BarChart
+                    data={slChartData}
+                    margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
+                  >
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="#334155"
+                      opacity={0.3}
+                    />
                     <XAxis dataKey="policy" stroke="#64748b" fontSize={10} />
-                    <YAxis domain={[90, 100]} stroke="#64748b" fontSize={10} tickFormatter={(v) => `${v}%`} />
+                    <YAxis
+                      domain={[90, 100]}
+                      stroke="#64748b"
+                      fontSize={10}
+                      tickFormatter={(v) => `${v}%`}
+                    />
                     <Tooltip
                       formatter={(v) => `${v.toFixed(2)}%`}
                       contentStyle={{
@@ -340,7 +441,11 @@ export default function SimulationPage() {
                         fontSize: "11px",
                       }}
                     />
-                    <Bar dataKey="serviceLevel" fill="#10b981" radius={[4, 4, 0, 0]} />
+                    <Bar
+                      dataKey="serviceLevel"
+                      fill="#10b981"
+                      radius={[4, 4, 0, 0]}
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -349,19 +454,58 @@ export default function SimulationPage() {
 
           {/* Per-SKU Simulation Results Table */}
           <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
-            <h3 className="text-xs font-semibold text-slate-200">Per-SKU Simulated Scenario Performance</h3>
+            <h3 className="text-xs font-semibold text-slate-200">
+              Per-SKU Simulated Scenario Performance
+            </h3>
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs font-mono">
                 <thead>
                   <tr className="border-b border-white/[0.06] text-slate-500 bg-white/[0.01]">
-                    <th scope="col" className="px-3 py-2.5 font-sans">SKU</th>
-                    <th scope="col" className="px-3 py-2.5 text-right font-sans">Total Cost (Det)</th>
-                    <th scope="col" className="px-3 py-2.5 text-right font-sans text-emerald-400">Total Cost (Emp)</th>
-                    <th scope="col" className="px-3 py-2.5 text-right font-sans">Mean Diff</th>
-                    <th scope="col" className="px-3 py-2.5 text-right font-sans">% Scenarios Cheaper</th>
-                    <th scope="col" className="px-3 py-2.5 text-right font-sans">Fill Rate (Det / Emp)</th>
-                    <th scope="col" className="px-3 py-2.5 text-right font-sans">Stockout Units</th>
-                    <th scope="col" className="px-3 py-2.5 font-sans text-center">Details</th>
+                    <th scope="col" className="px-3 py-2.5 font-sans">
+                      SKU
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-2.5 text-right font-sans"
+                    >
+                      Total Cost (Det)
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-2.5 text-right font-sans text-emerald-400"
+                    >
+                      Total Cost (Emp)
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-2.5 text-right font-sans"
+                    >
+                      Mean Diff
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-2.5 text-right font-sans"
+                    >
+                      % Scenarios Cheaper
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-2.5 text-right font-sans"
+                    >
+                      Fill Rate (Det / Emp)
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-2.5 text-right font-sans"
+                    >
+                      Stockout Units
+                    </th>
+                    <th
+                      scope="col"
+                      className="px-3 py-2.5 font-sans text-center"
+                    >
+                      Details
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.02] text-slate-300">
@@ -373,65 +517,121 @@ export default function SimulationPage() {
                       <>
                         <tr
                           key={sku.sku_id}
-                          onClick={() => setExpandedSku(isExpanded ? null : sku.sku_id)}
+                          onClick={() =>
+                            setExpandedSku(isExpanded ? null : sku.sku_id)
+                          }
                           className="hover:bg-white/[0.02] cursor-pointer transition-colors"
                         >
-                          <td className="px-3 py-3 font-medium text-slate-100">{sku.sku_id}</td>
-                          <td className="px-3 py-3 text-right">{fmtInr(sku.deterministic?.total_cost_mean)}</td>
+                          <td className="px-3 py-3 font-medium text-slate-100">
+                            {sku.sku_id}
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            {fmtInr(sku.deterministic?.total_cost_mean)}
+                          </td>
                           <td className="px-3 py-3 text-right font-bold text-emerald-300">
                             {fmtInr(sku.uncertainty_aware?.total_cost_mean)}
                           </td>
                           <td className="px-3 py-3 text-right">
-                            <span className={diff < 0 ? "text-emerald-400" : diff > 0 ? "text-rose-400" : "text-slate-400"}>
+                            <span
+                              className={
+                                diff < 0
+                                  ? "text-emerald-400"
+                                  : diff > 0
+                                    ? "text-rose-400"
+                                    : "text-slate-400"
+                              }
+                            >
                               {diff > 0 ? `+${fmtInr(diff)}` : fmtInr(diff)}
                             </span>
                           </td>
                           <td className="px-3 py-3 text-right">
-                            {fmtPct(sku.paired?.share_scenarios_uncertainty_aware_cheaper, 1)}
+                            {fmtPct(
+                              sku.paired
+                                ?.share_scenarios_uncertainty_aware_cheaper,
+                              1,
+                            )}
                           </td>
                           <td className="px-3 py-3 text-right">
                             {fmtPct(sku.deterministic?.service_level_mean, 1)} /{" "}
                             <span className="text-emerald-300 font-semibold">
-                              {fmtPct(sku.uncertainty_aware?.service_level_mean, 1)}
+                              {fmtPct(
+                                sku.uncertainty_aware?.service_level_mean,
+                                1,
+                              )}
                             </span>
                           </td>
                           <td className="px-3 py-3 text-right">
-                            {fmtNum(sku.deterministic?.stockout_units_mean, 1)} / {fmtNum(sku.uncertainty_aware?.stockout_units_mean, 1)}
+                            {fmtNum(sku.deterministic?.stockout_units_mean, 1)}{" "}
+                            /{" "}
+                            {fmtNum(
+                              sku.uncertainty_aware?.stockout_units_mean,
+                              1,
+                            )}
                           </td>
                           <td className="px-3 py-3 text-center">
                             <button
                               type="button"
                               className="text-slate-400 hover:text-slate-200 p-1"
                             >
-                              {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                              {isExpanded ? (
+                                <ChevronUp size={14} />
+                              ) : (
+                                <ChevronDown size={14} />
+                              )}
                             </button>
                           </td>
                         </tr>
 
                         {isExpanded && (
-                          <tr key={`${sku.sku_id}-exp`} className="bg-slate-900/40">
-                            <td colSpan={8} className="px-5 py-4 text-xs font-sans text-slate-300">
+                          <tr
+                            key={`${sku.sku_id}-exp`}
+                            className="bg-slate-900/40"
+                          >
+                            <td
+                              colSpan={8}
+                              className="px-5 py-4 text-xs font-sans text-slate-300"
+                            >
                               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                                 <div>
-                                  <span className="text-[10px] text-slate-500 block uppercase">Starting Inventory</span>
-                                  <span className="font-mono text-slate-200 font-medium">{sku.start_inventory} units</span>
-                                </div>
-                                <div>
-                                  <span className="text-[10px] text-slate-500 block uppercase">Deterministic P05–P95</span>
-                                  <span className="font-mono text-slate-200">
-                                    {fmtInr(sku.deterministic.total_cost_p05)} – {fmtInr(sku.deterministic.total_cost_p95)}
+                                  <span className="text-[10px] text-slate-500 block uppercase">
+                                    Starting Inventory
+                                  </span>
+                                  <span className="font-mono text-slate-200 font-medium">
+                                    {sku.start_inventory} units
                                   </span>
                                 </div>
                                 <div>
-                                  <span className="text-[10px] text-slate-500 block uppercase">Uncertainty-Aware P05–P95</span>
+                                  <span className="text-[10px] text-slate-500 block uppercase">
+                                    Deterministic P05–P95
+                                  </span>
+                                  <span className="font-mono text-slate-200">
+                                    {fmtInr(sku.deterministic.total_cost_p05)} –{" "}
+                                    {fmtInr(sku.deterministic.total_cost_p95)}
+                                  </span>
+                                </div>
+                                <div>
+                                  <span className="text-[10px] text-slate-500 block uppercase">
+                                    Uncertainty-Aware P05–P95
+                                  </span>
                                   <span className="font-mono text-emerald-300">
-                                    {fmtInr(sku.uncertainty_aware.total_cost_p05)} – {fmtInr(sku.uncertainty_aware.total_cost_p95)}
+                                    {fmtInr(
+                                      sku.uncertainty_aware.total_cost_p05,
+                                    )}{" "}
+                                    –{" "}
+                                    {fmtInr(
+                                      sku.uncertainty_aware.total_cost_p95,
+                                    )}
                                   </span>
                                 </div>
                                 <div>
-                                  <span className="text-[10px] text-slate-500 block uppercase">Equal Scenarios</span>
+                                  <span className="text-[10px] text-slate-500 block uppercase">
+                                    Equal Scenarios
+                                  </span>
                                   <span className="font-mono text-slate-200">
-                                    {fmtPct(sku.paired.share_scenarios_equal, 1)}
+                                    {fmtPct(
+                                      sku.paired.share_scenarios_equal,
+                                      1,
+                                    )}
                                   </span>
                                 </div>
                               </div>
@@ -448,7 +648,9 @@ export default function SimulationPage() {
             {/* Notes List */}
             {simData?.notes && (
               <div className="pt-3 border-t border-white/[0.06] flex flex-col gap-1.5 text-xs text-slate-400">
-                <span className="font-semibold text-slate-300">Simulation Methodology & Policy Notes:</span>
+                <span className="font-semibold text-slate-300">
+                  Simulation Methodology & Policy Notes:
+                </span>
                 <ul className="list-disc list-inside flex flex-col gap-1 text-[11px] text-slate-400">
                   {simData.notes.map((n, idx) => (
                     <li key={idx}>{n}</li>

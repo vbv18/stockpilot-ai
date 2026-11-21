@@ -6,10 +6,25 @@ const nonNeg = z.number().finite().nonnegative();
 const finArr = z.array(fin);
 const nonNegArr = z.array(nonNeg);
 
-export const PySkuStatus = z.enum(["ok", "insufficient_history", "no_demand", "model_failed"]);
-export const PyIntervalStatus = z.enum(["ok", "insufficient_residuals", "not_computed"]);
+export const PySkuStatus = z.enum([
+  "ok",
+  "insufficient_history",
+  "no_demand",
+  "model_failed",
+]);
+export const PyIntervalStatus = z.enum([
+  "ok",
+  "insufficient_residuals",
+  "not_computed",
+]);
 
-export const PySkuSeries = z.object({ sku_id: SkuId, start_date: IsoDate, values: z.array(nonNeg).min(1).max(5000) }).strict();
+export const PySkuSeries = z
+  .object({
+    sku_id: SkuId,
+    start_date: IsoDate,
+    values: z.array(nonNeg).min(1).max(5000),
+  })
+  .strict();
 
 export const PyForecastParams = z
   .object({
@@ -24,7 +39,12 @@ export const PyForecastParams = z
   })
   .strict();
 
-export const PyForecastRequest = z.object({ series: z.array(PySkuSeries).min(1).max(100), params: PyForecastParams }).strict();
+export const PyForecastRequest = z
+  .object({
+    series: z.array(PySkuSeries).min(1).max(100),
+    params: PyForecastParams,
+  })
+  .strict();
 export const PyEvaluateRequest = PyForecastRequest;
 
 export const PyRunMeta = z
@@ -40,7 +60,9 @@ export const PyRunMeta = z
   })
   .strict();
 
-export const PyIntervalBand = z.object({ p10: nonNegArr, p50: nonNegArr, p90: nonNegArr }).strict();
+export const PyIntervalBand = z
+  .object({ p10: nonNegArr, p50: nonNegArr, p90: nonNegArr })
+  .strict();
 
 export const PySkuForecast = z
   .object({
@@ -63,16 +85,27 @@ export const PySkuForecast = z
   })
   .strict();
 
-export const PyForecastResponse = z.object({ run_meta: PyRunMeta, params: PyForecastParams, skus: z.array(PySkuForecast) }).strict();
+export const PyForecastResponse = z
+  .object({
+    run_meta: PyRunMeta,
+    params: PyForecastParams,
+    skus: z.array(PySkuForecast),
+  })
+  .strict();
 
 export const PyPointMetrics = z
   .object({
-    mae: nonNeg, rmse: nonNeg, wape: nonNeg.nullable(),
+    mae: nonNeg,
+    rmse: nonNeg,
+    wape: nonNeg.nullable(),
     wape_status: z.enum(["ok", "zero_denominator"]),
-    sum_abs_error: nonNeg, sum_actual: nonNeg,
+    sum_abs_error: nonNeg,
+    sum_actual: nonNeg,
   })
   .strict();
-export const PyIntervalMetrics = z.object({ nominal_coverage: fin, coverage: nonNeg, mean_width: nonNeg }).strict();
+export const PyIntervalMetrics = z
+  .object({ nominal_coverage: fin, coverage: nonNeg, mean_width: nonNeg })
+  .strict();
 
 export const PySkuEvaluation = z
   .object({
@@ -96,7 +129,12 @@ export const PySkuEvaluation = z
   .strict();
 
 export const PyModelAggregate = z
-  .object({ n_skus: z.number().int().nonnegative(), mae_mean: fin.nullable(), rmse_mean: fin.nullable(), wape_pooled: fin.nullable() })
+  .object({
+    n_skus: z.number().int().nonnegative(),
+    mae_mean: fin.nullable(),
+    rmse_mean: fin.nullable(),
+    wape_pooled: fin.nullable(),
+  })
   .strict();
 export const PyEvaluateAggregate = z
   .object({
@@ -108,7 +146,12 @@ export const PyEvaluateAggregate = z
   })
   .strict();
 export const PyEvaluateResponse = z
-  .object({ run_meta: PyRunMeta, params: PyForecastParams, skus: z.array(PySkuEvaluation), aggregate: PyEvaluateAggregate })
+  .object({
+    run_meta: PyRunMeta,
+    params: PyForecastParams,
+    skus: z.array(PySkuEvaluation),
+    aggregate: PyEvaluateAggregate,
+  })
   .strict();
 
 // ---------- optimize ----------
@@ -134,17 +177,31 @@ export const PyOptimizeParams = z
   })
   .strict();
 
-export const PyOptimizeRequest = z.object({ skus: z.array(PyOptimizeSkuInput).min(1).max(100), params: PyOptimizeParams }).strict();
+export const PyOptimizeRequest = z
+  .object({
+    skus: z.array(PyOptimizeSkuInput).min(1).max(100),
+    params: PyOptimizeParams,
+  })
+  .strict();
 
 export const PyLeadTimeDemandStats = z
-  .object({ mean: fin, std: nonNeg, p10: fin, p50: fin, p90: fin, skewness: fin })
+  .object({
+    mean: fin,
+    std: nonNeg,
+    p10: fin,
+    p50: fin,
+    p90: fin,
+    skewness: fin,
+  })
   .strict();
 
 export const PySkuOptimization = z
   .object({
     sku_id: SkuId,
     status: z.enum(["ok", "ineligible"]),
-    ineligible_reason: z.enum(["no_forecast_demand", "forecast_shorter_than_lead_time"]).nullable(),
+    ineligible_reason: z
+      .enum(["no_forecast_demand", "forecast_shorter_than_lead_time"])
+      .nullable(),
     avg_daily_forecast: fin.nullable(),
     annual_demand: fin.nullable(),
     holding_cost_annual: fin.nullable(),
@@ -166,7 +223,13 @@ export const PySkuOptimization = z
   })
   .strict();
 
-export const PyOptimizeResponse = z.object({ run_meta: PyRunMeta, params: PyOptimizeParams, skus: z.array(PySkuOptimization) }).strict();
+export const PyOptimizeResponse = z
+  .object({
+    run_meta: PyRunMeta,
+    params: PyOptimizeParams,
+    skus: z.array(PySkuOptimization),
+  })
+  .strict();
 
 // ---------- simulate ----------
 export const PySimulateSkuInput = z
@@ -193,14 +256,28 @@ export const PySimulateParams = z
   })
   .strict();
 
-export const PySimulateRequest = z.object({ skus: z.array(PySimulateSkuInput).min(1).max(100), params: PySimulateParams }).strict();
+export const PySimulateRequest = z
+  .object({
+    skus: z.array(PySimulateSkuInput).min(1).max(100),
+    params: PySimulateParams,
+  })
+  .strict();
 
 export const PyPolicyMetrics = z
   .object({
-    total_cost_mean: fin, total_cost_std: nonNeg, total_cost_p05: fin, total_cost_p95: fin,
-    ordering_cost_mean: fin, holding_cost_mean: fin, shortage_cost_mean: fin,
-    avg_inventory_mean: fin, stockout_units_mean: fin, stockout_rate_mean: fin,
-    service_level_mean: fin, service_level_p05: fin, order_count_mean: fin,
+    total_cost_mean: fin,
+    total_cost_std: nonNeg,
+    total_cost_p05: fin,
+    total_cost_p95: fin,
+    ordering_cost_mean: fin,
+    holding_cost_mean: fin,
+    shortage_cost_mean: fin,
+    avg_inventory_mean: fin,
+    stockout_units_mean: fin,
+    stockout_rate_mean: fin,
+    service_level_mean: fin,
+    service_level_p05: fin,
+    order_count_mean: fin,
   })
   .strict();
 
@@ -225,8 +302,15 @@ export const PySkuSimulation = z
 
 export const PyAggregatePolicyMetrics = z
   .object({
-    total_cost: fin, ordering_cost: fin, holding_cost: fin, shortage_cost: fin,
-    avg_inventory: fin, stockout_units: fin, stockout_rate_mean: fin, service_level: fin, order_count: fin,
+    total_cost: fin,
+    ordering_cost: fin,
+    holding_cost: fin,
+    shortage_cost: fin,
+    avg_inventory: fin,
+    stockout_units: fin,
+    stockout_rate_mean: fin,
+    service_level: fin,
+    order_count: fin,
   })
   .strict();
 
@@ -239,5 +323,10 @@ export const PySimulateAggregate = z
   .strict();
 
 export const PySimulateResponse = z
-  .object({ run_meta: PyRunMeta, params: PySimulateParams, skus: z.array(PySkuSimulation), aggregate: PySimulateAggregate })
+  .object({
+    run_meta: PyRunMeta,
+    params: PySimulateParams,
+    skus: z.array(PySkuSimulation),
+    aggregate: PySimulateAggregate,
+  })
   .strict();

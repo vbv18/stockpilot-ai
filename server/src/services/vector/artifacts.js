@@ -13,7 +13,10 @@ export const ARTIFACT_TYPES = [
   "simulation_aggregate",
 ];
 
-const n = (x, d = 2) => (x !== null && x !== undefined && !Number.isNaN(Number(x)) ? Number(x).toFixed(d) : "n/a");
+const n = (x, d = 2) =>
+  x !== null && x !== undefined && !Number.isNaN(Number(x))
+    ? Number(x).toFixed(d)
+    : "n/a";
 
 /**
  * Builds pure artifact docs from a loaded session bundle
@@ -22,7 +25,15 @@ const n = (x, d = 2) => (x !== null && x !== undefined && !Number.isNaN(Number(x
  * @returns {Array<{ artifactType: string, artifactId: string, skuId: string|null, text: string }>}
  */
 export function buildArtifactDocs(bundle) {
-  const { session, dataset, forecastRun, assumptions, optimizationRun, simulationRun, history } = bundle;
+  const {
+    session,
+    dataset,
+    forecastRun,
+    assumptions,
+    optimizationRun,
+    simulationRun,
+    history,
+  } = bundle;
   const docs = [];
 
   const sessionId = session._id.toString();
@@ -52,14 +63,20 @@ export function buildArtifactDocs(bundle) {
     );
   }
   if (optimizationRun) {
-    const nOk = optimizationRun.result?.skus ? Object.keys(optimizationRun.result.skus).length : 0;
-    overviewParts.push(`Optimization run ${optimizationRun._id} produced policies for ${nOk} SKUs.`);
+    const nOk = optimizationRun.result?.skus
+      ? Object.keys(optimizationRun.result.skus).length
+      : 0;
+    overviewParts.push(
+      `Optimization run ${optimizationRun._id} produced policies for ${nOk} SKUs.`,
+    );
   }
   if (simulationRun) {
     const sc = simulationRun.scenarioCount ?? "n/a";
     const hz = simulationRun.horizonDays ?? "n/a";
     const sd = simulationRun.seed ?? "n/a";
-    overviewParts.push(`Simulation run ${simulationRun._id}: ${sc} scenarios over ${hz} days, seed ${sd}.`);
+    overviewParts.push(
+      `Simulation run ${simulationRun._id}: ${sc} scenarios over ${hz} days, seed ${sd}.`,
+    );
   }
   docs.push({
     artifactType: "session_overview",
@@ -106,7 +123,9 @@ export function buildArtifactDocs(bundle) {
     const a = agg.autoets || {};
     const sn = agg.seasonal_naive || {};
     const im = agg.interval_metrics || {};
-    const nSkus = forecastRun.result.skus ? Object.keys(forecastRun.result.skus).length : 0;
+    const nSkus = forecastRun.result.skus
+      ? Object.keys(forecastRun.result.skus).length
+      : 0;
 
     docs.push({
       artifactType: "forecast_aggregate",
@@ -138,15 +157,26 @@ export function buildArtifactDocs(bundle) {
         });
       } else {
         const meanArr = skuData.autoets_mean || [];
-        const avg = meanArr.length > 0 ? meanArr.reduce((a, b) => a + b, 0) / meanArr.length : 0;
+        const avg =
+          meanArr.length > 0
+            ? meanArr.reduce((a, b) => a + b, 0) / meanArr.length
+            : 0;
         const total = meanArr.reduce((a, b) => a + b, 0);
         const p10Arr = skuData.p10 || [];
         const p90Arr = skuData.p90 || [];
-        const p10avg = p10Arr.length > 0 ? p10Arr.reduce((a, b) => a + b, 0) / p10Arr.length : 0;
-        const p90avg = p90Arr.length > 0 ? p90Arr.reduce((a, b) => a + b, 0) / p90Arr.length : 0;
+        const p10avg =
+          p10Arr.length > 0
+            ? p10Arr.reduce((a, b) => a + b, 0) / p10Arr.length
+            : 0;
+        const p90avg =
+          p90Arr.length > 0
+            ? p90Arr.reduce((a, b) => a + b, 0) / p90Arr.length
+            : 0;
 
         const rs = n(skuData.residual_std);
-        const blocks = skuData.residual_blocks ? skuData.residual_blocks.length : 0;
+        const blocks = skuData.residual_blocks
+          ? skuData.residual_blocks.length
+          : 0;
 
         // History calculations for last 28, prior 28, zero days
         const sHistory = historyBySku.get(skuId) || [];
@@ -164,7 +194,10 @@ export function buildArtifactDocs(bundle) {
           z = last56.filter((q) => q === 0).length;
         }
 
-        const warningsStr = (skuData.warnings && skuData.warnings.length > 0) ? skuData.warnings.join("; ") : "none";
+        const warningsStr =
+          skuData.warnings && skuData.warnings.length > 0
+            ? skuData.warnings.join("; ")
+            : "none";
 
         docs.push({
           artifactType: "forecast_sku",
@@ -183,9 +216,18 @@ export function buildArtifactDocs(bundle) {
         const ae = evalData.autoets || {};
         const sn = evalData.seasonal_naive || {};
         const im = evalData.interval_metrics || {};
-        const wapeAe = ae.wape !== null && ae.wape !== undefined ? `${n(ae.wape * 100, 1)}%` : "WAPE n/a (zero actual demand)";
-        const wapeSn = sn.wape !== null && sn.wape !== undefined ? `${n(sn.wape * 100, 1)}%` : "WAPE n/a (zero actual demand)";
-        const cov = im.coverage_p10_p90 !== null && im.coverage_p10_p90 !== undefined ? `${n(im.coverage_p10_p90 * 100, 1)}%` : "n/a";
+        const wapeAe =
+          ae.wape !== null && ae.wape !== undefined
+            ? `${n(ae.wape * 100, 1)}%`
+            : "WAPE n/a (zero actual demand)";
+        const wapeSn =
+          sn.wape !== null && sn.wape !== undefined
+            ? `${n(sn.wape * 100, 1)}%`
+            : "WAPE n/a (zero actual demand)";
+        const cov =
+          im.coverage_p10_p90 !== null && im.coverage_p10_p90 !== undefined
+            ? `${n(im.coverage_p10_p90 * 100, 1)}%`
+            : "n/a";
         const width = n(im.mean_width);
 
         docs.push({
@@ -206,14 +248,19 @@ export function buildArtifactDocs(bundle) {
     const a = assumptions.values || {};
     const prov = assumptions.provenance || {};
     const provParts = [];
-    if (prov.orderingCost) provParts.push(`ordering cost: ${prov.orderingCost}`);
+    if (prov.orderingCost)
+      provParts.push(`ordering cost: ${prov.orderingCost}`);
     if (prov.holdingCost) provParts.push(`holding cost: ${prov.holdingCost}`);
-    const provSummary = provParts.length > 0 ? provParts.join("; ") : "user provided";
+    const provSummary =
+      provParts.length > 0 ? provParts.join("; ") : "user provided";
 
     const S = n(a.orderingCost);
     const H = n(a.holdingCost);
     const unit = a.holdingCostUnit || "per_unit_per_day";
-    const Hday = unit === "per_unit_per_year" ? n(a.holdingCost / 365, 4) : n(a.holdingCost);
+    const Hday =
+      unit === "per_unit_per_year"
+        ? n(a.holdingCost / 365, 4)
+        : n(a.holdingCost);
     const P = n(a.shortagePenalty);
     const L = a.leadTimeDays ?? "n/a";
     const SL = n((a.targetServiceLevel ?? 0) * 100, 1);
@@ -260,7 +307,10 @@ export function buildArtifactDocs(bundle) {
           artifactType: "optimization_sku",
           artifactId: optRunId,
           skuId,
-          text: `SKU ${skuId}: no policy computed (${skuOpt.message || "ineligible"}).`.slice(0, 1500),
+          text: `SKU ${skuId}: no policy computed (${skuOpt.message || "ineligible"}).`.slice(
+            0,
+            1500,
+          ),
         });
         continue;
       }
@@ -290,8 +340,14 @@ export function buildArtifactDocs(bundle) {
       const s = n(ltd.skewness);
 
       const rLevel = risk?.level || "low";
-      const flagsStr = risk?.flags && risk.flags.length > 0 ? risk.flags.map((f) => f.code).join(", ") : "none";
-      const warningsStr = skuOpt.warnings && skuOpt.warnings.length > 0 ? skuOpt.warnings.join("; ") : "none";
+      const flagsStr =
+        risk?.flags && risk.flags.length > 0
+          ? risk.flags.map((f) => f.code).join(", ")
+          : "none";
+      const warningsStr =
+        skuOpt.warnings && skuOpt.warnings.length > 0
+          ? skuOpt.warnings.join("; ")
+          : "none";
 
       docs.push({
         artifactType: "optimization_sku",
@@ -305,7 +361,10 @@ export function buildArtifactDocs(bundle) {
     }
 
     // optimization_aggregate
-    const meanGap = totalGaps.length > 0 ? totalGaps.reduce((a, b) => a + b, 0) / totalGaps.length : 0;
+    const meanGap =
+      totalGaps.length > 0
+        ? totalGaps.reduce((a, b) => a + b, 0) / totalGaps.length
+        : 0;
     const maxGap = totalGaps.length > 0 ? Math.max(...totalGaps) : 0;
 
     docs.push({
@@ -331,7 +390,10 @@ export function buildArtifactDocs(bundle) {
       const d = simData.deterministic || {};
       const u = simData.uncertainty_aware || {};
       const diff = n(simData.mean_total_cost_diff);
-      const pctCheaper = n((simData.fraction_uncertainty_cheaper ?? 0) * 100, 1);
+      const pctCheaper = n(
+        (simData.fraction_uncertainty_cheaper ?? 0) * 100,
+        1,
+      );
 
       docs.push({
         artifactType: "simulation_sku",

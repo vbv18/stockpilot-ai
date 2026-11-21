@@ -21,7 +21,10 @@ export async function getActiveOptimizationRun(userId, sessionId) {
 export async function getActiveAssumptionSetForRun(run) {
   const assumptionSet = await AssumptionSetModel.findById(run.assumptionSetId);
   if (!assumptionSet) {
-    throw new AppError("NOT_FOUND", "Assumption set for optimization run not found");
+    throw new AppError(
+      "NOT_FOUND",
+      "Assumption set for optimization run not found",
+    );
   }
   return assumptionSet;
 }
@@ -37,8 +40,12 @@ export async function buildSessionRisk(userId, sessionId) {
     return { targetServiceLevel: 0.95, risks: [] };
   }
 
-  const assumptionSet = await AssumptionSetModel.findById(optRun.assumptionSetId);
-  const targetServiceLevel = assumptionSet ? assumptionSet.targetServiceLevel : 0.95;
+  const assumptionSet = await AssumptionSetModel.findById(
+    optRun.assumptionSetId,
+  );
+  const targetServiceLevel = assumptionSet
+    ? assumptionSet.targetServiceLevel
+    : 0.95;
 
   const forecastRun = await ForecastRunModel.findById(optRun.forecastRunId);
   const evaluationsBySku = new Map();

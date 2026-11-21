@@ -12,7 +12,10 @@ RULES
 9. State missing or insufficient evidence in warnings. Never invent SKU metrics, forecast values, simulation results, or citations.
 10. Style: concise, plain language for an inventory planner. No marketing language.`;
 
-export const COMPOSE_INSTRUCTION = (jsonSchema, evidenceList) => `Now write the final answer as ONE JSON object and nothing else (no markdown fences, no commentary).
+export const COMPOSE_INSTRUCTION = (
+  jsonSchema,
+  evidenceList,
+) => `Now write the final answer as ONE JSON object and nothing else (no markdown fences, no commentary).
 It must validate against this JSON Schema:
 ${jsonSchema}
 

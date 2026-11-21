@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import { logger } from "../lib/logger.js";
 import AnalysisSessionModel from "../models/analysisSession.model.js";
 import DatasetModel from "../models/dataset.model.js";
 import ForecastRunModel from "../models/forecastRun.model.js";
@@ -16,7 +15,7 @@ export async function connectDatabase() {
     const connectionString = process.env.MONGODB_URI || process.env.MONGO_URI;
     const dbName = process.env.MONGODB_DB_NAME;
     await mongoose.connect(connectionString, dbName ? { dbName } : undefined);
-    logger.info("Connected to MongoDB");
+    console.log("Connected to MongoDB");
 
     // Sync indexes for all models
     await Promise.allSettled([
@@ -31,13 +30,13 @@ export async function connectDatabase() {
       AiMessageModel.syncIndexes(),
       JobModel.syncIndexes(),
     ]);
-    logger.info("MongoDB model indexes synchronized");
+    console.log("MongoDB model indexes synchronized");
   } catch (error) {
-    logger.error({
+    console.error("[DB] Error connecting to MongoDB", {
       status: error.response?.status,
       message: error.message,
       data: error.response?.data,
-    }, "[DB] Error connecting to MongoDB");
+    });
 
     process.exit(1);
   }

@@ -10,7 +10,11 @@ export const ALLOWED_TRANSITIONS = {
   forecast_failed: ["forecasting"],
   forecast_ready: ["assumptions_pending"],
   assumptions_pending: ["assumptions_pending", "optimizing"],
-  optimizing: ["optimization_ready", "optimization_failed", "assumptions_pending"],
+  optimizing: [
+    "optimization_ready",
+    "optimization_failed",
+    "assumptions_pending",
+  ],
   optimization_failed: ["assumptions_pending", "optimizing"],
   optimization_ready: ["assumptions_pending", "simulating"],
   simulating: ["completed", "simulation_failed", "optimization_ready"],
@@ -29,10 +33,26 @@ export const ACTION_ALLOWED_FROM = {
   mapping: ["uploading", "validating", "validation_failed"],
   confirmDataset: ["validating"],
   forecast: ["dataset_ready", "forecast_failed"],
-  assumptions: ["forecast_ready", "assumptions_pending", "optimization_failed", "optimization_ready", "simulation_failed", "completed"],
+  assumptions: [
+    "forecast_ready",
+    "assumptions_pending",
+    "optimization_failed",
+    "optimization_ready",
+    "simulation_failed",
+    "completed",
+  ],
   optimize: ["assumptions_pending", "optimization_failed"],
   simulate: ["optimization_ready", "simulation_failed", "completed"],
-  aiEligible: ["forecast_ready", "assumptions_pending", "optimizing", "optimization_ready", "optimization_failed", "simulating", "simulation_failed", "completed"],
+  aiEligible: [
+    "forecast_ready",
+    "assumptions_pending",
+    "optimizing",
+    "optimization_ready",
+    "optimization_failed",
+    "simulating",
+    "simulation_failed",
+    "completed",
+  ],
 };
 
 /** Session status to restore when a RUNNING job is cancelled. */

@@ -1,5 +1,8 @@
 import { AppError } from "../../../lib/errors.js";
-import { GetSkuForecastInput, GetSkuForecastOutput } from "../../../contracts/ai.js";
+import {
+  GetSkuForecastInput,
+  GetSkuForecastOutput,
+} from "../../../contracts/ai.js";
 
 /**
  * get_sku_forecast tool
@@ -14,7 +17,10 @@ export async function getSkuForecast(rawArgs, bundle) {
 
   const skuData = forecastRun.result.skus[args.skuId];
   if (!skuData) {
-    throw new AppError("NOT_FOUND", `SKU ${args.skuId} is not part of this session`);
+    throw new AppError(
+      "NOT_FOUND",
+      `SKU ${args.skuId} is not part of this session`,
+    );
   }
 
   const evalData = forecastRun.result.evaluation?.skus?.[args.skuId] || null;
@@ -27,7 +33,11 @@ export async function getSkuForecast(rawArgs, bundle) {
 
   if (history && Array.isArray(history)) {
     const skuHistoryObj = history.find((h) => h.skuId === args.skuId);
-    if (skuHistoryObj && skuHistoryObj.series && skuHistoryObj.series.length > 0) {
+    if (
+      skuHistoryObj &&
+      skuHistoryObj.series &&
+      skuHistoryObj.series.length > 0
+    ) {
       const series = skuHistoryObj.series;
       if (args.includeHistoryDays > 0) {
         const slice = series.slice(-args.includeHistoryDays);
@@ -63,7 +73,9 @@ export async function getSkuForecast(rawArgs, bundle) {
     const p90 = skuData.p90 || [];
 
     forecastObj = {
-      startDate: forecastRun.result.forecast_start_date || new Date().toISOString().slice(0, 10),
+      startDate:
+        forecastRun.result.forecast_start_date ||
+        new Date().toISOString().slice(0, 10),
       autoetsMean,
       seasonalNaiveMean,
       p10,
@@ -72,10 +84,14 @@ export async function getSkuForecast(rawArgs, bundle) {
     };
 
     const avgDailyForecast =
-      autoetsMean.length > 0 ? autoetsMean.reduce((a, b) => a + b, 0) / autoetsMean.length : 0;
+      autoetsMean.length > 0
+        ? autoetsMean.reduce((a, b) => a + b, 0) / autoetsMean.length
+        : 0;
     const totalForecast28 = autoetsMean.reduce((a, b) => a + b, 0);
-    const avgP10 = p10.length > 0 ? p10.reduce((a, b) => a + b, 0) / p10.length : null;
-    const avgP90 = p90.length > 0 ? p90.reduce((a, b) => a + b, 0) / p90.length : null;
+    const avgP10 =
+      p10.length > 0 ? p10.reduce((a, b) => a + b, 0) / p10.length : null;
+    const avgP90 =
+      p90.length > 0 ? p90.reduce((a, b) => a + b, 0) / p90.length : null;
 
     summary = {
       avgDailyForecast,
@@ -107,7 +123,9 @@ export async function getSkuForecast(rawArgs, bundle) {
     summary,
     evaluation,
     residualStd: skuData.residual_std ?? null,
-    nResidualBlocks: skuData.residual_blocks ? skuData.residual_blocks.length : 0,
+    nResidualBlocks: skuData.residual_blocks
+      ? skuData.residual_blocks.length
+      : 0,
     warnings: skuData.warnings || [],
   });
 

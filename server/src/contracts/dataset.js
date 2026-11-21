@@ -14,10 +14,14 @@ export const ColumnMappingBody = z
     negativeQuantityPolicy: NegativeQuantityPolicy,
   })
   .strict()
-  .refine((m) => new Set([m.skuColumn, m.dateColumn, m.quantityColumn]).size === 3, {
-    message: "skuColumn, dateColumn and quantityColumn must be three different columns",
-    path: ["skuColumn"],
-  });
+  .refine(
+    (m) => new Set([m.skuColumn, m.dateColumn, m.quantityColumn]).size === 3,
+    {
+      message:
+        "skuColumn, dateColumn and quantityColumn must be three different columns",
+      path: ["skuColumn"],
+    },
+  );
 
 export const DatasetConfirmBody = z
   .object({
@@ -27,7 +31,13 @@ export const DatasetConfirmBody = z
   })
   .strict();
 
-export const REJECTED_REASONS = ["invalid_sku", "invalid_date", "non_numeric_quantity", "negative_quantity", "malformed_row"];
+export const REJECTED_REASONS = [
+  "invalid_sku",
+  "invalid_date",
+  "non_numeric_quantity",
+  "negative_quantity",
+  "malformed_row",
+];
 export const RejectedReason = z.enum(REJECTED_REASONS);
 
 export const SkuCoverage = z
@@ -47,13 +57,15 @@ export const ValidationSummary = z
     totalDataRows: z.number().int().nonnegative(),
     acceptedRows: z.number().int().nonnegative(),
     rejectedRows: z.number().int().nonnegative(),
-    rejectedByReason: z.object({
-      invalid_sku: z.number().int().nonnegative(),
-      invalid_date: z.number().int().nonnegative(),
-      non_numeric_quantity: z.number().int().nonnegative(),
-      negative_quantity: z.number().int().nonnegative(),
-      malformed_row: z.number().int().nonnegative(),
-    }).strict(),
+    rejectedByReason: z
+      .object({
+        invalid_sku: z.number().int().nonnegative(),
+        invalid_date: z.number().int().nonnegative(),
+        non_numeric_quantity: z.number().int().nonnegative(),
+        negative_quantity: z.number().int().nonnegative(),
+        malformed_row: z.number().int().nonnegative(),
+      })
+      .strict(),
     negativeQuantityRows: z.number().int().nonnegative(),
     droppedNegativeRows: z.number().int().nonnegative(),
     zeroQuantityRows: z.number().int().nonnegative(),

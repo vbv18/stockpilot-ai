@@ -8,7 +8,8 @@ function matchesAny(claimed, unit, candidates) {
   return candidates.some(
     (v) =>
       numbersMatch(claimed, v) ||
-      (percentLike && (numbersMatch(claimed / 100, v) || numbersMatch(claimed, v * 100))),
+      (percentLike &&
+        (numbersMatch(claimed / 100, v) || numbersMatch(claimed, v * 100))),
   );
 }
 
@@ -32,7 +33,14 @@ export function extractNumbers(text, knownSkuIds = []) {
 }
 
 export function groundDraft(args) {
-  const { draft, ledger, sessionId, toolActions, extraWarnings = [], knownSkuIds = [] } = args;
+  const {
+    draft,
+    ledger,
+    sessionId,
+    toolActions,
+    extraWarnings = [],
+    knownSkuIds = [],
+  } = args;
   let droppedEvidence = 0;
   let removedFindings = 0;
 
@@ -45,7 +53,10 @@ export function groundDraft(args) {
     }
     const prior = evidenceMap.get(evidenceId);
     const keys = [
-      ...new Set([...(prior?.metricKeys ?? []), ...metricKeys.filter((k) => e.keys.includes(k))]),
+      ...new Set([
+        ...(prior?.metricKeys ?? []),
+        ...metricKeys.filter((k) => e.keys.includes(k)),
+      ]),
     ].slice(0, 20);
     evidenceMap.set(evidenceId, {
       evidenceId,
@@ -68,7 +79,10 @@ export function groundDraft(args) {
       removedFindings++;
       continue;
     }
-    if (typeof f.value === "number" && !matchesAny(f.value, f.unit, entry.numbers)) {
+    if (
+      typeof f.value === "number" &&
+      !matchesAny(f.value, f.unit, entry.numbers)
+    ) {
       removedFindings++;
       continue;
     }
@@ -86,7 +100,8 @@ export function groundDraft(args) {
   ];
 
   for (const n of numbersToCheck) {
-    if (!n.percent && Number.isInteger(n.value) && SAFE_INTS.has(n.value)) continue;
+    if (!n.percent && Number.isInteger(n.value) && SAFE_INTS.has(n.value))
+      continue;
     if (!matchesAny(n.value, n.percent ? "percent" : "none", all)) {
       unverified.add(n.raw);
     }
@@ -108,7 +123,9 @@ export function groundDraft(args) {
   const status =
     removedFindings === 0 && unverifiedNumbers.length === 0
       ? "verified"
-      : draft.keyFindings && draft.keyFindings.length > 0 && keyFindings.length === 0
+      : draft.keyFindings &&
+          draft.keyFindings.length > 0 &&
+          keyFindings.length === 0
         ? "unverified"
         : "partial";
 

@@ -38,6 +38,7 @@ StockPilot AI combines deterministic statistical algorithms with modern agentic 
 ## 2. Quickstart & Setup
 
 ### Prerequisites
+
 - Node.js 20+
 - Python 3.11+
 - MongoDB 6+
@@ -46,6 +47,7 @@ StockPilot AI combines deterministic statistical algorithms with modern agentic 
 - Qdrant Cluster (optional, for Ask AI vector search)
 
 ### 2.1 Backend Setup (`server/`)
+
 ```bash
 cd server
 npm install
@@ -54,6 +56,7 @@ npm run dev
 ```
 
 ### 2.2 Stats Engine Setup (`stats-service/`)
+
 ```bash
 cd stats-service
 python -m venv venv
@@ -67,6 +70,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
 
 ### 2.3 Frontend Setup (`client/`)
+
 ```bash
 cd client
 npm install
@@ -77,33 +81,33 @@ npm run dev
 
 ## 3. Environment Variables Reference
 
-| Variable | Description | Default / Example |
-| :--- | :--- | :--- |
-| `PORT` | Node.js API server port | `5000` |
-| `NODE_ENV` | Application environment | `development` |
-| `CLIENT_ORIGIN` | Allowed CORS origin | `http://localhost:5173` |
-| `MONGO_URI` | MongoDB connection string | `mongodb://localhost:27017/stockpilot` |
-| `REDIS_URL` | Redis connection URI | `redis://localhost:6379` |
-| `STORAGE_DRIVER` | File storage driver (`local` or `s3`) | `local` |
-| `LOCAL_STORAGE_DIR` | Directory for local file storage | `./storage` |
-| `STATS_SERVICE_URL` | Python stats service URL | `http://127.0.0.1:8000` |
-| `STATS_SERVICE_KEY` | Shared secret for Python service | `secret-key-1234` |
-| `FIREBASE_PROJECT_ID` | Firebase Project ID | `stockpilot-ai-prod` |
-| `FIREBASE_CLIENT_EMAIL` | Firebase service account email | `admin@stockpilot.iam.gserviceaccount.com` |
-| `FIREBASE_PRIVATE_KEY` | Firebase service account private key | `-----BEGIN PRIVATE KEY...` |
-| `QDRANT_URL` | Qdrant endpoint | `https://xxxx.cloud.qdrant.io:6333` |
-| `QDRANT_API_KEY` | Qdrant authentication API key | `qdrant-secret-key` |
-| `QDRANT_COLLECTION` | Qdrant collection name | `stockpilot_artifacts` |
-| `EMBEDDING_PROVIDER` | Embeddings provider (`gemini` or `openai`) | `gemini` |
-| `EMBEDDING_MODEL` | Embedding model identifier | `gemini-embedding-001` |
-| `EMBEDDING_API_KEY` | Embedding provider API key | `ai-embedding-key` |
-| `EMBEDDING_DIM` | Embedding vector dimension | `3072` |
-| `LLM_PROVIDER` | LLM provider (`groq`, `gemini`, `openai`, `anthropic`) | `groq` |
-| `LLM_MODEL` | LLM model identifier | `llama-3.3-70b-versatile` |
-| `LLM_API_KEY` | LLM provider API key | `ai-llm-key` |
-| `RATE_LIMIT_GENERAL_PER_MINUTE` | General API rate limit | `120` |
-| `RATE_LIMIT_UPLOADS_PER_HOUR` | Upload rate limit per user | `10` |
-| `RATE_LIMIT_AI_PER_MINUTE` | AI assistant rate limit per user | `20` |
+| Variable                        | Description                                            | Default / Example                          |
+| :------------------------------ | :----------------------------------------------------- | :----------------------------------------- |
+| `PORT`                          | Node.js API server port                                | `5000`                                     |
+| `NODE_ENV`                      | Application environment                                | `development`                              |
+| `CLIENT_ORIGIN`                 | Allowed CORS origin                                    | `http://localhost:5173`                    |
+| `MONGO_URI`                     | MongoDB connection string                              | `mongodb://localhost:27017/stockpilot`     |
+| `REDIS_URL`                     | Redis connection URI                                   | `redis://localhost:6379`                   |
+| `STORAGE_DRIVER`                | File storage driver (`local` or `s3`)                  | `local`                                    |
+| `LOCAL_STORAGE_DIR`             | Directory for local file storage                       | `./storage`                                |
+| `STATS_SERVICE_URL`             | Python stats service URL                               | `http://127.0.0.1:8000`                    |
+| `STATS_SERVICE_KEY`             | Shared secret for Python service                       | `secret-key-1234`                          |
+| `FIREBASE_PROJECT_ID`           | Firebase Project ID                                    | `stockpilot-ai-prod`                       |
+| `FIREBASE_CLIENT_EMAIL`         | Firebase service account email                         | `admin@stockpilot.iam.gserviceaccount.com` |
+| `FIREBASE_PRIVATE_KEY`          | Firebase service account private key                   | `-----BEGIN PRIVATE KEY...`                |
+| `QDRANT_URL`                    | Qdrant endpoint                                        | `https://xxxx.cloud.qdrant.io:6333`        |
+| `QDRANT_API_KEY`                | Qdrant authentication API key                          | `qdrant-secret-key`                        |
+| `QDRANT_COLLECTION`             | Qdrant collection name                                 | `stockpilot_artifacts`                     |
+| `EMBEDDING_PROVIDER`            | Embeddings provider (`gemini` or `openai`)             | `gemini`                                   |
+| `EMBEDDING_MODEL`               | Embedding model identifier                             | `gemini-embedding-001`                     |
+| `EMBEDDING_API_KEY`             | Embedding provider API key                             | `ai-embedding-key`                         |
+| `EMBEDDING_DIM`                 | Embedding vector dimension                             | `3072`                                     |
+| `LLM_PROVIDER`                  | LLM provider (`groq`, `gemini`, `openai`, `anthropic`) | `groq`                                     |
+| `LLM_MODEL`                     | LLM model identifier                                   | `llama-3.3-70b-versatile`                  |
+| `LLM_API_KEY`                   | LLM provider API key                                   | `ai-llm-key`                               |
+| `RATE_LIMIT_GENERAL_PER_MINUTE` | General API rate limit                                 | `120`                                      |
+| `RATE_LIMIT_UPLOADS_PER_HOUR`   | Upload rate limit per user                             | `10`                                       |
+| `RATE_LIMIT_AI_PER_MINUTE`      | AI assistant rate limit per user                       | `20`                                       |
 
 ---
 
@@ -112,12 +116,15 @@ npm run dev
 StockPilot AI processes standard transactional or sales records. Uploaded files can be formatted as CSV or Excel (`.xlsx`).
 
 ### Expected Columns
+
 - `date`: Calendar date of sale or consumption (`YYYY-MM-DD` or standard datetime).
 - `sku`: Product identifier / SKU code (e.g., `SKU-10023`, `85123A`).
 - `quantity`: Number of units sold or demanded on that date (positive integers/floats).
 
 ### UCI Online Retail Mapping
+
 If using the open UCI Online Retail dataset:
+
 - Map `InvoiceDate` $\rightarrow$ `date`
 - Map `StockCode` $\rightarrow$ `sku`
 - Map `Quantity` $\rightarrow$ `quantity` (filter out cancellation rows where `Quantity < 0`).

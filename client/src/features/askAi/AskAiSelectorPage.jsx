@@ -23,8 +23,10 @@ function SessionCard({ session }) {
   const navigate = useNavigate();
   const [showHistory, setShowHistory] = useState(false);
 
-  const [createConversation, { isLoading: isCreating }] = useCreateConversationMutation();
-  const [reindexSession, { isLoading: isReindexing }] = useReindexSessionMutation();
+  const [createConversation, { isLoading: isCreating }] =
+    useCreateConversationMutation();
+  const [reindexSession, { isLoading: isReindexing }] =
+    useReindexSessionMutation();
 
   const { data: convList = [] } = useListConversationsQuery(
     { sessionId: session.id },
@@ -71,7 +73,9 @@ function SessionCard({ session }) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
-            <h3 className="text-base font-semibold text-white">{session.name}</h3>
+            <h3 className="text-base font-semibold text-white">
+              {session.name}
+            </h3>
             <StatusBadge status={session.status} />
           </div>
           <div className="flex items-center gap-2 text-xs text-slate-500 mt-1">
@@ -117,7 +121,8 @@ function SessionCard({ session }) {
 
       {!session.isComplete && (
         <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs">
-          This analysis is partially complete; answers cover the completed stages only.
+          This analysis is partially complete; answers cover the completed
+          stages only.
         </div>
       )}
 
@@ -129,17 +134,26 @@ function SessionCard({ session }) {
             disabled={isCreating}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-xs font-medium text-white transition-colors disabled:opacity-50"
           >
-            {isCreating ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            {isCreating ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Plus size={14} />
+            )}
             <span>Start new conversation</span>
           </button>
 
-          {["failed", "skipped", "not_indexed"].includes(session.aiIndexStatus) && (
+          {["failed", "skipped", "not_indexed"].includes(
+            session.aiIndexStatus,
+          ) && (
             <button
               onClick={() => reindexSession(session.id)}
               disabled={isReindexing}
               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-xs font-medium text-slate-300 transition-colors disabled:opacity-50"
             >
-              <RefreshCw size={12} className={isReindexing ? "animate-spin" : ""} />
+              <RefreshCw
+                size={12}
+                className={isReindexing ? "animate-spin" : ""}
+              />
               <span>Rebuild AI context</span>
             </button>
           )}
@@ -158,7 +172,9 @@ function SessionCard({ session }) {
       {showHistory && (
         <div className="pt-2 border-t border-white/[0.06] space-y-2">
           {convList.length === 0 ? (
-            <p className="text-xs text-slate-500 italic py-2">No previous conversations for this session.</p>
+            <p className="text-xs text-slate-500 italic py-2">
+              No previous conversations for this session.
+            </p>
           ) : (
             convList.map((c) => (
               <Link
@@ -184,7 +200,12 @@ function SessionCard({ session }) {
 }
 
 export function AskAiSelectorPage() {
-  const { data: sessions = [], isLoading, error, refetch } = useListAiSessionsQuery();
+  const {
+    data: sessions = [],
+    isLoading,
+    error,
+    refetch,
+  } = useListAiSessionsQuery();
 
   if (isLoading) {
     return (
@@ -218,9 +239,12 @@ export function AskAiSelectorPage() {
             <Brain size={16} />
             <span>Inventory Decision Support</span>
           </div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">Ask StockPilot AI</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-white">
+            Ask StockPilot AI
+          </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Select an analysis session to inspect demand forecast models, investigate inventory risks, and simulate what-if scenarios.
+            Select an analysis session to inspect demand forecast models,
+            investigate inventory risks, and simulate what-if scenarios.
           </p>
         </div>
 
@@ -230,9 +254,12 @@ export function AskAiSelectorPage() {
               <Sparkles size={24} />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-white">No eligible analysis sessions</h3>
+              <h3 className="text-base font-semibold text-white">
+                No eligible analysis sessions
+              </h3>
               <p className="text-xs text-slate-400 max-w-sm mt-1">
-                AI analysis requires a session with at least a completed demand forecast.
+                AI analysis requires a session with at least a completed demand
+                forecast.
               </p>
             </div>
             <Link

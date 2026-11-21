@@ -9,7 +9,8 @@ function keyGenerator(req, res) {
 }
 
 function rateLimitHandler(req, res) {
-  const requestId = res.locals.requestId || req.headers["x-request-id"] || "unknown";
+  const requestId =
+    res.locals.requestId || req.headers["x-request-id"] || "unknown";
   return res.status(429).json({
     error: {
       code: "RATE_LIMITED",

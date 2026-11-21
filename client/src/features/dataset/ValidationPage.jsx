@@ -1,9 +1,20 @@
 import { useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { AlertCircle, AlertTriangle, CheckCircle2, ChevronDown, ChevronUp, Loader2 } from "lucide-react";
+import {
+  AlertCircle,
+  AlertTriangle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+} from "lucide-react";
 import { COPY } from "../../lib/copy.js";
 import { fmtInt, fmtNum, fmtPct } from "../../lib/format.js";
-import { useConfirmDatasetMutation, useGetValidationQuery, usePutMappingMutation } from "../../lib/api.js";
+import {
+  useConfirmDatasetMutation,
+  useGetValidationQuery,
+  usePutMappingMutation,
+} from "../../lib/api.js";
 import { JobProgress } from "../jobs/JobProgress.jsx";
 import { useJobTracker } from "../jobs/useJobTracker.js";
 import { ColumnMappingPanel } from "./ColumnMappingPanel.jsx";
@@ -12,7 +23,12 @@ export default function ValidationPage() {
   const { session } = useOutletContext();
   const navigate = useNavigate();
 
-  const { data: valData, isLoading, error, refetch } = useGetValidationQuery(session.id);
+  const {
+    data: valData,
+    isLoading,
+    error,
+    refetch,
+  } = useGetValidationQuery(session.id);
 
   // Job tracking for validation or transformation
   const [jobId, setJobId] = useState(() => {
@@ -32,13 +48,15 @@ export default function ValidationPage() {
     }
   });
 
-  const [confirmDataset, { isLoading: isConfirming }] = useConfirmDatasetMutation();
+  const [confirmDataset, { isLoading: isConfirming }] =
+    useConfirmDatasetMutation();
   const [putMapping, { isLoading: isRemapping }] = usePutMappingMutation();
 
   const [showMappingPanel, setShowMappingPanel] = useState(false);
   const [confirmAggDuplicates, setConfirmAggDuplicates] = useState(false);
   const [confirmCompleteCoverage, setConfirmCompleteCoverage] = useState(false);
-  const [acknowledgeDroppedNegatives, setAcknowledgeDroppedNegatives] = useState(false);
+  const [acknowledgeDroppedNegatives, setAcknowledgeDroppedNegatives] =
+    useState(false);
   const [confirmError, setConfirmError] = useState("");
 
   const [showPreview, setShowPreview] = useState(false);
@@ -58,7 +76,9 @@ export default function ValidationPage() {
           {error?.data?.message || "Failed to load validation details."}
         </p>
         {error?.data?.requestId && (
-          <span className="text-[11px] text-slate-500">Reference: {error.data.requestId}</span>
+          <span className="text-[11px] text-slate-500">
+            Reference: {error.data.requestId}
+          </span>
         )}
         <button
           onClick={() => refetch()}
@@ -105,7 +125,9 @@ export default function ValidationPage() {
       setJobId(newJobId);
       sessionStorage.setItem(`sp:job:${session.id}:transformation`, newJobId);
     } catch (err) {
-      setConfirmError(err.data?.message || err.message || "Failed to confirm dataset.");
+      setConfirmError(
+        err.data?.message || err.message || "Failed to confirm dataset.",
+      );
     }
   };
 
@@ -121,16 +143,21 @@ export default function ValidationPage() {
       sessionStorage.setItem(`sp:job:${session.id}:validation`, newJobId);
       setShowMappingPanel(false);
     } catch (err) {
-      setConfirmError(err.data?.message || err.message || "Failed to update mapping.");
+      setConfirmError(
+        err.data?.message || err.message || "Failed to update mapping.",
+      );
     }
   };
 
   return (
     <div className="flex flex-col gap-6 max-w-5xl mx-auto">
       <div>
-        <h2 className="text-xl font-bold text-white tracking-tight">Dataset Validation Report</h2>
+        <h2 className="text-xl font-bold text-white tracking-tight">
+          Dataset Validation Report
+        </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Review the health summary, missing calendar dates, and column alignment before generating demand series.
+          Review the health summary, missing calendar dates, and column
+          alignment before generating demand series.
         </p>
       </div>
 
@@ -140,7 +167,10 @@ export default function ValidationPage() {
         <div className="p-4 rounded-2xl bg-rose-500/10 border border-rose-500/20 flex flex-col gap-3">
           <div className="flex items-center gap-2 text-rose-300 font-semibold text-xs">
             <AlertCircle size={16} />
-            <span>Validation Failed: {valData.error?.message || "Invalid dataset records."}</span>
+            <span>
+              Validation Failed:{" "}
+              {valData.error?.message || "Invalid dataset records."}
+            </span>
           </div>
 
           <div className="flex items-center gap-3 mt-1">
@@ -178,28 +208,38 @@ export default function ValidationPage() {
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <div className="bg-[#13151c] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1">
               <span className="text-[11px] text-slate-400">Total Rows</span>
-              <span className="text-base font-bold text-slate-100">{fmtInt(summary.totalDataRows)}</span>
+              <span className="text-base font-bold text-slate-100">
+                {fmtInt(summary.totalDataRows)}
+              </span>
             </div>
 
             <div className="bg-[#13151c] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1">
               <span className="text-[11px] text-slate-400">Accepted Rows</span>
-              <span className="text-base font-bold text-emerald-400">{fmtInt(summary.acceptedRows)}</span>
+              <span className="text-base font-bold text-emerald-400">
+                {fmtInt(summary.acceptedRows)}
+              </span>
             </div>
 
             <div className="bg-[#13151c] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1">
               <span className="text-[11px] text-slate-400">Rejected Rows</span>
-              <span className="text-base font-bold text-rose-400">{fmtInt(summary.rejectedRows)}</span>
+              <span className="text-base font-bold text-rose-400">
+                {fmtInt(summary.rejectedRows)}
+              </span>
             </div>
 
             <div className="bg-[#13151c] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1">
               <span className="text-[11px] text-slate-400">Distinct SKUs</span>
-              <span className="text-base font-bold text-slate-100">{fmtInt(summary.distinctSkus)}</span>
+              <span className="text-base font-bold text-slate-100">
+                {fmtInt(summary.distinctSkus)}
+              </span>
             </div>
 
             <div className="bg-[#13151c] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1">
               <span className="text-[11px] text-slate-400">Date Range</span>
               <span className="text-xs font-semibold text-slate-100">
-                {summary.dateRange ? `${summary.dateRange.min} → ${summary.dateRange.max}` : "-"}
+                {summary.dateRange
+                  ? `${summary.dateRange.min} → ${summary.dateRange.max}`
+                  : "-"}
               </span>
               <span className="text-[10px] text-slate-500 font-mono">
                 {summary.calendarDaysInRange} days span
@@ -208,7 +248,9 @@ export default function ValidationPage() {
 
             <div className="bg-[#13151c] border border-white/[0.08] rounded-xl p-3.5 flex flex-col gap-1">
               <span className="text-[11px] text-slate-400">Missing Days</span>
-              <span className="text-base font-bold text-amber-400">{fmtInt(summary.missingCalendarDays)}</span>
+              <span className="text-base font-bold text-amber-400">
+                {fmtInt(summary.missingCalendarDays)}
+              </span>
               <span className="text-[10px] text-slate-500">Zero-filled</span>
             </div>
           </div>
@@ -231,57 +273,87 @@ export default function ValidationPage() {
           {/* Rejection Details & Facts */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col gap-3">
-              <h3 className="text-xs font-semibold text-slate-300">Rejected Rows by Reason</h3>
+              <h3 className="text-xs font-semibold text-slate-300">
+                Rejected Rows by Reason
+              </h3>
               <table className="w-full text-left text-xs">
                 <thead>
                   <tr className="border-b border-white/[0.06] text-slate-500">
-                    <th scope="col" className="py-2">Reason</th>
-                    <th scope="col" className="py-2 text-right">Count</th>
+                    <th scope="col" className="py-2">
+                      Reason
+                    </th>
+                    <th scope="col" className="py-2 text-right">
+                      Count
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/[0.02] text-slate-300">
                   <tr>
                     <td className="py-2">Invalid SKU length or empty</td>
-                    <td className="py-2 text-right font-mono">{fmtInt(summary.rejectedByReason.invalid_sku)}</td>
+                    <td className="py-2 text-right font-mono">
+                      {fmtInt(summary.rejectedByReason.invalid_sku)}
+                    </td>
                   </tr>
                   <tr>
                     <td className="py-2">Invalid date format</td>
-                    <td className="py-2 text-right font-mono">{fmtInt(summary.rejectedByReason.invalid_date)}</td>
+                    <td className="py-2 text-right font-mono">
+                      {fmtInt(summary.rejectedByReason.invalid_date)}
+                    </td>
                   </tr>
                   <tr>
                     <td className="py-2">Non-numeric quantity</td>
-                    <td className="py-2 text-right font-mono">{fmtInt(summary.rejectedByReason.non_numeric_quantity)}</td>
+                    <td className="py-2 text-right font-mono">
+                      {fmtInt(summary.rejectedByReason.non_numeric_quantity)}
+                    </td>
                   </tr>
                   <tr>
                     <td className="py-2">Negative quantity</td>
-                    <td className="py-2 text-right font-mono">{fmtInt(summary.rejectedByReason.negative_quantity)}</td>
+                    <td className="py-2 text-right font-mono">
+                      {fmtInt(summary.rejectedByReason.negative_quantity)}
+                    </td>
                   </tr>
                   <tr>
                     <td className="py-2">Malformed row columns count</td>
-                    <td className="py-2 text-right font-mono">{fmtInt(summary.rejectedByReason.malformed_row)}</td>
+                    <td className="py-2 text-right font-mono">
+                      {fmtInt(summary.rejectedByReason.malformed_row)}
+                    </td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
             <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col gap-3">
-              <h3 className="text-xs font-semibold text-slate-300">Dataset Properties</h3>
+              <h3 className="text-xs font-semibold text-slate-300">
+                Dataset Properties
+              </h3>
               <div className="flex flex-col gap-2 text-xs text-slate-300 divide-y divide-white/[0.02]">
                 <div className="flex justify-between py-1.5">
-                  <span className="text-slate-400">Duplicate SKU & Date rows</span>
-                  <span className="font-mono font-medium">{fmtInt(summary.duplicateSkuDateRecords)} (summed)</span>
+                  <span className="text-slate-400">
+                    Duplicate SKU & Date rows
+                  </span>
+                  <span className="font-mono font-medium">
+                    {fmtInt(summary.duplicateSkuDateRecords)} (summed)
+                  </span>
                 </div>
                 <div className="flex justify-between py-1.5">
                   <span className="text-slate-400">Zero-quantity rows</span>
-                  <span className="font-mono font-medium">{fmtInt(summary.zeroQuantityRows)}</span>
+                  <span className="font-mono font-medium">
+                    {fmtInt(summary.zeroQuantityRows)}
+                  </span>
                 </div>
                 <div className="flex justify-between py-1.5">
                   <span className="text-slate-400">Dropped negative rows</span>
-                  <span className="font-mono font-medium text-amber-300">{fmtInt(summary.droppedNegativeRows)}</span>
+                  <span className="font-mono font-medium text-amber-300">
+                    {fmtInt(summary.droppedNegativeRows)}
+                  </span>
                 </div>
                 <div className="flex justify-between py-1.5">
-                  <span className="text-slate-400">Days with active orders</span>
-                  <span className="font-mono font-medium">{fmtInt(summary.daysWithAnyRecord)}</span>
+                  <span className="text-slate-400">
+                    Days with active orders
+                  </span>
+                  <span className="font-mono font-medium">
+                    {fmtInt(summary.daysWithAnyRecord)}
+                  </span>
                 </div>
               </div>
             </div>
@@ -294,26 +366,44 @@ export default function ValidationPage() {
                 <h3 className="text-xs font-semibold text-slate-300">
                   Top SKU Coverage (Top {summary.topSkuCoverage.length})
                 </h3>
-                <span className="text-[11px] text-slate-500">Sorted by total demand</span>
+                <span className="text-[11px] text-slate-500">
+                  Sorted by total demand
+                </span>
               </div>
 
               <div className="overflow-x-auto max-h-72">
                 <table className="w-full text-left text-xs">
                   <thead>
                     <tr className="border-b border-white/[0.06] text-slate-500 bg-white/[0.01]">
-                      <th scope="col" className="px-3 py-2">SKU</th>
-                      <th scope="col" className="px-3 py-2 text-right">Total Units</th>
-                      <th scope="col" className="px-3 py-2 text-right">Active Days</th>
-                      <th scope="col" className="px-3 py-2">Date Span</th>
-                      <th scope="col" className="px-3 py-2 text-right">Coverage %</th>
+                      <th scope="col" className="px-3 py-2">
+                        SKU
+                      </th>
+                      <th scope="col" className="px-3 py-2 text-right">
+                        Total Units
+                      </th>
+                      <th scope="col" className="px-3 py-2 text-right">
+                        Active Days
+                      </th>
+                      <th scope="col" className="px-3 py-2">
+                        Date Span
+                      </th>
+                      <th scope="col" className="px-3 py-2 text-right">
+                        Coverage %
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/[0.02] text-slate-300">
                     {summary.topSkuCoverage.map((sku) => (
                       <tr key={sku.skuId} className="hover:bg-white/[0.01]">
-                        <td className="px-3 py-2 font-mono font-medium text-slate-100">{sku.skuId}</td>
-                        <td className="px-3 py-2 text-right font-mono">{fmtNum(sku.totalQuantity, 0)}</td>
-                        <td className="px-3 py-2 text-right font-mono">{fmtInt(sku.activeDays)}</td>
+                        <td className="px-3 py-2 font-mono font-medium text-slate-100">
+                          {sku.skuId}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {fmtNum(sku.totalQuantity, 0)}
+                        </td>
+                        <td className="px-3 py-2 text-right font-mono">
+                          {fmtInt(sku.activeDays)}
+                        </td>
                         <td className="px-3 py-2 text-slate-400 text-[11px]">
                           {sku.firstDate} → {sku.lastDate} ({sku.spanDays}d)
                         </td>
@@ -325,7 +415,9 @@ export default function ValidationPage() {
                                 style={{ width: `${sku.coveragePct}%` }}
                               />
                             </div>
-                            <span className="font-mono text-[11px]">{fmtPct(sku.coveragePct / 100, 1)}</span>
+                            <span className="font-mono text-[11px]">
+                              {fmtPct(sku.coveragePct / 100, 1)}
+                            </span>
                           </div>
                         </td>
                       </tr>
@@ -343,8 +435,14 @@ export default function ValidationPage() {
               onClick={() => setShowPreview((p) => !p)}
               className="self-start text-xs text-slate-400 hover:text-slate-200 flex items-center gap-1 font-medium cursor-pointer"
             >
-              <span>{showPreview ? "Hide CSV preview" : "Show CSV raw preview"}</span>
-              {showPreview ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              <span>
+                {showPreview ? "Hide CSV preview" : "Show CSV raw preview"}
+              </span>
+              {showPreview ? (
+                <ChevronUp size={14} />
+              ) : (
+                <ChevronDown size={14} />
+              )}
             </button>
 
             {showPreview && preview.length > 0 && (
@@ -353,7 +451,11 @@ export default function ValidationPage() {
                   <thead>
                     <tr className="border-b border-white/[0.06] text-slate-400">
                       {columns.map((c) => (
-                        <th key={c} scope="col" className="px-3 py-2 font-medium whitespace-nowrap">
+                        <th
+                          key={c}
+                          scope="col"
+                          className="px-3 py-2 font-medium whitespace-nowrap"
+                        >
                           {c}
                         </th>
                       ))}
@@ -363,7 +465,10 @@ export default function ValidationPage() {
                     {preview.map((row, rIdx) => (
                       <tr key={rIdx}>
                         {row.map((cell, cIdx) => (
-                          <td key={cIdx} className="px-3 py-1.5 whitespace-nowrap">
+                          <td
+                            key={cIdx}
+                            className="px-3 py-1.5 whitespace-nowrap"
+                          >
                             {cell}
                           </td>
                         ))}
@@ -384,7 +489,8 @@ export default function ValidationPage() {
                   <span>Confirm Dataset Ingestion</span>
                 </h3>
                 <p className="text-xs text-slate-400 mt-1">
-                  Please acknowledge the aggregation and coverage rules to prepare contiguous time-series files.
+                  Please acknowledge the aggregation and coverage rules to
+                  prepare contiguous time-series files.
                 </p>
               </div>
 
@@ -402,18 +508,24 @@ export default function ValidationPage() {
                     onChange={(e) => setConfirmAggDuplicates(e.target.checked)}
                     className="mt-0.5 accent-indigo-500"
                   />
-                  <span>Sum multiple records for the same SKU and date into one daily total.</span>
+                  <span>
+                    Sum multiple records for the same SKU and date into one
+                    daily total.
+                  </span>
                 </label>
 
                 <label className="flex items-start gap-2.5 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={confirmCompleteCoverage}
-                    onChange={(e) => setConfirmCompleteCoverage(e.target.checked)}
+                    onChange={(e) =>
+                      setConfirmCompleteCoverage(e.target.checked)
+                    }
                     className="mt-0.5 accent-indigo-500"
                   />
                   <span>
-                    I confirm: {COPY.seriesNote} (missing calendar days will be filled with 0 demand).
+                    I confirm: {COPY.seriesNote} (missing calendar days will be
+                    filled with 0 demand).
                   </span>
                 </label>
 
@@ -422,11 +534,14 @@ export default function ValidationPage() {
                     <input
                       type="checkbox"
                       checked={acknowledgeDroppedNegatives}
-                      onChange={(e) => setAcknowledgeDroppedNegatives(e.target.checked)}
+                      onChange={(e) =>
+                        setAcknowledgeDroppedNegatives(e.target.checked)
+                      }
                       className="mt-0.5 accent-indigo-500"
                     />
                     <span className="text-amber-300">
-                      Exclude {droppedNegCount} negative-quantity rows; they are treated as returns, not demand.
+                      Exclude {droppedNegCount} negative-quantity rows; they are
+                      treated as returns, not demand.
                     </span>
                   </label>
                 )}
@@ -438,7 +553,9 @@ export default function ValidationPage() {
                 onClick={handleConfirm}
                 className="self-end px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-semibold text-white shadow-md shadow-indigo-700/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 cursor-pointer transition-all"
               >
-                {isConfirming ? <Loader2 size={14} className="animate-spin" /> : null}
+                {isConfirming ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : null}
                 <span>Confirm and Prepare Dataset</span>
               </button>
             </div>

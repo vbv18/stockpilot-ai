@@ -1,7 +1,6 @@
 import crypto from "node:crypto";
 import { getEnv } from "../config/env.js";
 import { AppError } from "../lib/errors.js";
-import { logger } from "../lib/logger.js";
 import { JobModel } from "../models/job.model.js";
 
 const handlers = new Map();
@@ -69,9 +68,11 @@ async function executeJob(jobId) {
       releaseLock();
       const spec = handlers.get(jobDoc.stage);
       if (spec?.onCancelled) {
-        await spec.onCancelled(createContext(jobDoc, controller)).catch((err) => {
-          logger.error({ err, jobId }, "Error in job onCancelled handler");
-        });
+        await spec
+          .onCancelled(createContext(jobDoc, controller))
+          .catch((err) => {
+            console.error("Error in job onCancelled handler", { err, jobId });
+          });
       }
       return;
     }
@@ -82,11 +83,19 @@ async function executeJob(jobId) {
 
     const spec = handlers.get(jobDoc.stage);
     if (!spec) {
-      throw new AppError("INTERNAL_ERROR", `No handler registered for stage ${jobDoc.stage}`);
+      throw new AppError(
+        "INTERNAL_ERROR",
+        `No handler registered for stage ${jobDoc.stage}`,
+      );
     }
 
     const ctx = createContext(jobDoc, controller);
-    logger.info({ requestId: jobDoc.requestId, jobId, sessionId: jobDoc.sessionId.toString(), stage: jobDoc.stage }, "Job started");
+    console.log("Job started", {
+      requestId: jobDoc.requestId,
+      jobId,
+      sessionId: jobDoc.sessionId.toString(),
+      stage: jobDoc.stage,
+    });
 
     const outcome = await spec.run(ctx);
 
@@ -97,10 +106,16 @@ async function executeJob(jobId) {
       jobDoc.resultRef = outcome.resultRef;
     }
     await jobDoc.save();
-    logger.info({ requestId: jobDoc.requestId, jobId, sessionId: jobDoc.sessionId.toString(), stage: jobDoc.stage }, "Job succeeded");
+    console.log("Job succeeded", {
+      requestId: jobDoc.requestId,
+      jobId,
+      sessionId: jobDoc.sessionId.toString(),
+      stage: jobDoc.stage,
+    });
   } catch (err) {
     const isCancelled =
-      err instanceof AppError && err.code === "JOB_CANCELLED" || controller.signal.aborted;
+      (err instanceof AppError && err.code === "JOB_CANCELLED") ||
+      controller.signal.aborted;
 
     if (isCancelled) {
       if (jobDoc) {
@@ -109,12 +124,21 @@ async function executeJob(jobId) {
         await jobDoc.save();
         const spec = handlers.get(jobDoc.stage);
         if (spec?.onCancelled) {
-          await spec.onCancelled(createContext(jobDoc, controller)).catch((e) => {
-            logger.error({ err: e, jobId }, "Error in job onCancelled handler");
-          });
+          await spec
+            .onCancelled(createContext(jobDoc, controller))
+            .catch((e) => {
+              console.error("Error in job onCancelled handler", {
+                err: e,
+                jobId,
+              });
+            });
         }
       }
-      logger.info({ requestId: jobDoc?.requestId, jobId, sessionId: jobDoc?.sessionId?.toString() }, "Job cancelled");
+      console.log("Job cancelled", {
+        requestId: jobDoc?.requestId,
+        jobId,
+        sessionId: jobDoc?.sessionId?.toString(),
+      });
     } else {
       const code = err instanceof AppError ? err.code : "INTERNAL_ERROR";
       const userMessage =
@@ -133,12 +157,23 @@ async function executeJob(jobId) {
 
         const spec = handlers.get(jobDoc.stage);
         if (spec?.onFailed) {
-          await spec.onFailed(createContext(jobDoc, controller), { code, userMessage, retryable }).catch((e) => {
-            logger.error({ err: e, jobId }, "Error in job onFailed handler");
-          });
+          await spec
+            .onFailed(createContext(jobDoc, controller), {
+              code,
+              userMessage,
+              retryable,
+            })
+            .catch((e) => {
+              console.error("Error in job onFailed handler", { err: e, jobId });
+            });
         }
       }
-      logger.error({ err, requestId: jobDoc?.requestId, jobId, sessionId: jobDoc?.sessionId?.toString() }, "Job failed");
+      console.error("Job failed", {
+        err,
+        requestId: jobDoc?.requestId,
+        jobId,
+        sessionId: jobDoc?.sessionId?.toString(),
+      });
     }
   } finally {
     runningControllers.delete(jobId);
@@ -163,7 +198,12 @@ function createContext(jobDoc, controller) {
       }
       await JobModel.updateOne(
         { _id: jobId },
-        { $set: { "progress.pct": Math.round(pct), "progress.message": message } },
+        {
+          $set: {
+            "progress.pct": Math.round(pct),
+            "progress.message": message,
+          },
+        },
       );
     },
     throwIfCancelled() {
@@ -174,8 +214,19 @@ function createContext(jobDoc, controller) {
   };
 }
 
-export async function enqueueJob({ userId, sessionId, stage, hashInput, input, requestId }) {
-  const canonical = canonicalJson({ stage, sessionId: sessionId.toString(), hashInput });
+export async function enqueueJob({
+  userId,
+  sessionId,
+  stage,
+  hashInput,
+  input,
+  requestId,
+}) {
+  const canonical = canonicalJson({
+    stage,
+    sessionId: sessionId.toString(),
+    hashInput,
+  });
   const inputHash = crypto.createHash("sha256").update(canonical).digest("hex");
 
   try {
@@ -193,7 +244,7 @@ export async function enqueueJob({ userId, sessionId, stage, hashInput, input, r
     const jobId = job._id.toString();
     setImmediate(() => {
       executeJob(jobId).catch((err) => {
-        logger.error({ err, jobId }, "Unhandled error in executeJob loop");
+        console.error("Unhandled error in executeJob loop", { err, jobId });
       });
     });
 
@@ -233,7 +284,7 @@ export async function cancelJob(userId, sessionId, jobId) {
     const spec = handlers.get(job.stage);
     if (spec?.onCancelled) {
       await spec.onCancelled(createContext(job, controller)).catch((err) => {
-        logger.error({ err, jobId }, "Error in job onCancelled handler");
+        console.error("Error in job onCancelled handler", { err, jobId });
       });
     }
     return job.toObject();
@@ -261,7 +312,8 @@ export async function recoverInterruptedJobs() {
   for (const job of interrupted) {
     job.status = "failed";
     job.errorCode = "SERVER_RESTART";
-    job.userMessage = "The server restarted while this job was running. Please retry.";
+    job.userMessage =
+      "The server restarted while this job was running. Please retry.";
     job.retryable = true;
     job.finishedAt = new Date();
     await job.save();
@@ -277,7 +329,10 @@ export async function recoverInterruptedJobs() {
           retryable: true,
         })
         .catch((err) => {
-          logger.error({ err, jobId: job._id.toString() }, "Error recovering interrupted job");
+          console.error("Error recovering interrupted job", {
+            err,
+            jobId: job._id.toString(),
+          });
         });
     }
   }

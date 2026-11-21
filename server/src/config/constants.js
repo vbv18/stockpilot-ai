@@ -11,7 +11,12 @@ export const FORECAST_DEFAULTS = {
 };
 
 export const SIMULATION_DEFAULTS = { nScenarios: 500, horizonDays: 90 };
-export const SIMULATION_BOUNDS = { nScenariosMin: 100, nScenariosMax: 2000, horizonMin: 30, horizonMax: 180 };
+export const SIMULATION_BOUNDS = {
+  nScenariosMin: 100,
+  nScenariosMax: 2000,
+  horizonMin: 30,
+  horizonMax: 180,
+};
 
 export const DEMO_ASSUMPTION_DEFAULTS = {
   orderingCost: 200,

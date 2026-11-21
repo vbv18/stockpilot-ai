@@ -23,7 +23,10 @@ import { loadProcessedSeries } from "../processedSeries.js";
  * }>}
  */
 export async function loadSessionBundle(userId, sessionId) {
-  const session = await AnalysisSessionModel.findOne({ _id: sessionId, userId });
+  const session = await AnalysisSessionModel.findOne({
+    _id: sessionId,
+    userId,
+  });
   if (!session) {
     throw new AppError("NOT_FOUND", "Session not found");
   }
@@ -52,7 +55,8 @@ export async function loadSessionBundle(userId, sessionId) {
     : null;
 
   // Assumptions referenced by optimization run, else session's active set
-  const assumptionSetId = optimizationRun?.assumptionSetId || session.activeAssumptionSetId;
+  const assumptionSetId =
+    optimizationRun?.assumptionSetId || session.activeAssumptionSetId;
   const assumptions = assumptionSetId
     ? await AssumptionSetModel.findOne({ _id: assumptionSetId, userId })
     : null;

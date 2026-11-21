@@ -25,7 +25,9 @@ registerJobHandler("simulation", {
       throw new AppError("NOT_FOUND", "Optimization run not found");
     }
 
-    const assumptionSet = await AssumptionSetModel.findById(optRun.assumptionSetId);
+    const assumptionSet = await AssumptionSetModel.findById(
+      optRun.assumptionSetId,
+    );
     if (!assumptionSet) {
       throw new AppError("NOT_FOUND", "Assumption set not found");
     }
@@ -44,7 +46,8 @@ registerJobHandler("simulation", {
       seed,
       policyDefinitions: {
         deterministic: "ROP_d = mu_L + z*sigma_L, order quantity EOQ",
-        uncertainty_aware: "ROP_u = empirical alpha-quantile of simulated lead-time demand, order quantity EOQ",
+        uncertainty_aware:
+          "ROP_u = empirical alpha-quantile of simulated lead-time demand, order quantity EOQ",
         reviewPeriod: "daily",
         lostSales: true,
       },
@@ -119,7 +122,9 @@ registerJobHandler("simulation", {
 
     scheduleReindex(ctx.userId, ctx.sessionId, "simulation");
 
-    return { resultRef: { collection: "simulation_runs", id: simRun._id.toString() } };
+    return {
+      resultRef: { collection: "simulation_runs", id: simRun._id.toString() },
+    };
   },
 
   async onFailed(ctx, failure) {
@@ -133,7 +138,9 @@ registerJobHandler("simulation", {
         },
       },
     );
-    await transition(ctx.userId, ctx.sessionId, "simulation_failed").catch(() => {});
+    await transition(ctx.userId, ctx.sessionId, "simulation_failed").catch(
+      () => {},
+    );
     await setStage(ctx.userId, ctx.sessionId, "simulation", {
       status: "failed",
       errorCode: failure.code,
@@ -147,7 +154,9 @@ registerJobHandler("simulation", {
       { jobId: ctx.jobId, userId: ctx.userId },
       { $set: { status: "cancelled" } },
     );
-    await transition(ctx.userId, ctx.sessionId, "optimization_ready").catch(() => {});
+    await transition(ctx.userId, ctx.sessionId, "optimization_ready").catch(
+      () => {},
+    );
     await setStage(ctx.userId, ctx.sessionId, "simulation", {
       status: "cancelled",
     });

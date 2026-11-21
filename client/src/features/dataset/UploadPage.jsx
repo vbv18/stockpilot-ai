@@ -34,7 +34,8 @@ export default function UploadPage() {
     }
   });
 
-  const [putMapping, { isLoading: isSubmittingMapping }] = usePutMappingMutation();
+  const [putMapping, { isLoading: isSubmittingMapping }] =
+    usePutMappingMutation();
 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
@@ -46,7 +47,9 @@ export default function UploadPage() {
     }
 
     if (file.size > MAX_UPLOAD_MB * 1024 * 1024) {
-      setUploadError(`File exceeds the maximum allowed size of ${MAX_UPLOAD_MB} MB.`);
+      setUploadError(
+        `File exceeds the maximum allowed size of ${MAX_UPLOAD_MB} MB.`,
+      );
       return;
     }
 
@@ -99,16 +102,21 @@ export default function UploadPage() {
       setJobId(newJobId);
       sessionStorage.setItem(`sp:job:${session.id}:validation`, newJobId);
     } catch (err) {
-      setUploadError(err.data?.message || err.message || "Failed to start validation.");
+      setUploadError(
+        err.data?.message || err.message || "Failed to start validation.",
+      );
     }
   };
 
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
       <div>
-        <h2 className="text-xl font-bold text-white tracking-tight">Upload Dataset</h2>
+        <h2 className="text-xl font-bold text-white tracking-tight">
+          Upload Dataset
+        </h2>
         <p className="text-xs text-slate-400 mt-1">
-          Upload your historical sales records in CSV format. Daily observations are required to forecast lead-time demand.
+          Upload your historical sales records in CSV format. Daily observations
+          are required to forecast lead-time demand.
         </p>
       </div>
 
@@ -128,13 +136,22 @@ export default function UploadPage() {
           </div>
 
           <div>
-            <h3 className="text-sm font-semibold text-slate-200">Select sales CSV file</h3>
-            <p className="text-xs text-slate-500 mt-0.5">Maximum size: {MAX_UPLOAD_MB} MB</p>
+            <h3 className="text-sm font-semibold text-slate-200">
+              Select sales CSV file
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Maximum size: {MAX_UPLOAD_MB} MB
+            </p>
           </div>
 
           <label className="mt-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-xs font-semibold rounded-xl text-white cursor-pointer shadow-md shadow-indigo-700/20 transition-all">
             Browse File
-            <input type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
+            <input
+              type="file"
+              accept=".csv"
+              onChange={handleFileChange}
+              className="hidden"
+            />
           </label>
         </div>
       )}
@@ -145,7 +162,9 @@ export default function UploadPage() {
             <div className="flex items-center gap-2 text-slate-200 font-medium">
               <FileText size={16} className="text-indigo-400" />
               <span>{selectedFile.name}</span>
-              <span className="text-slate-500 font-mono">({Math.round(selectedFile.size / 1024)} KB)</span>
+              <span className="text-slate-500 font-mono">
+                ({Math.round(selectedFile.size / 1024)} KB)
+              </span>
             </div>
             <button
               type="button"
@@ -179,9 +198,12 @@ export default function UploadPage() {
                 <FileText size={16} />
               </div>
               <div>
-                <span className="font-semibold text-slate-200">{uploadResult.originalName}</span>
+                <span className="font-semibold text-slate-200">
+                  {uploadResult.originalName}
+                </span>
                 <p className="text-slate-500 text-[11px]">
-                  {uploadResult.columns.length} columns detected · delimiter &apos;{uploadResult.delimiter}&apos; · {uploadResult.encoding}
+                  {uploadResult.columns.length} columns detected · delimiter
+                  &apos;{uploadResult.delimiter}&apos; · {uploadResult.encoding}
                 </p>
               </div>
             </div>
@@ -203,7 +225,10 @@ export default function UploadPage() {
             preview={uploadResult.preview}
             initialMapping={uploadResult.suggestedMapping}
             onSubmit={handleMappingSubmit}
-            isLoading={isSubmittingMapping || (job && (job.status === "queued" || job.status === "running"))}
+            isLoading={
+              isSubmittingMapping ||
+              (job && (job.status === "queued" || job.status === "running"))
+            }
           />
         </div>
       )}

@@ -36,5 +36,8 @@ const aiConversationSchema = new mongoose.Schema(
 
 aiConversationSchema.index({ userId: 1, sessionId: 1 });
 
-export const AiConversationModel = mongoose.model("ai_conversations", aiConversationSchema);
+export const AiConversationModel = mongoose.model(
+  "ai_conversations",
+  aiConversationSchema,
+);
 export default AiConversationModel;

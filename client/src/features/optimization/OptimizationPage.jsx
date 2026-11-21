@@ -1,9 +1,19 @@
 import { useState } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
-import { AlertTriangle, ArrowRight, Info, Loader2, Play, RefreshCw } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  Info,
+  Loader2,
+  Play,
+  RefreshCw,
+} from "lucide-react";
 import { COPY } from "../../lib/copy.js";
 import { fmtInr, fmtNum, fmtPct } from "../../lib/format.js";
-import { useGetOptimizationQuery, useStartOptimizationMutation } from "../../lib/api.js";
+import {
+  useGetOptimizationQuery,
+  useStartOptimizationMutation,
+} from "../../lib/api.js";
 import { JobProgress } from "../jobs/JobProgress.jsx";
 import { useJobTracker } from "../jobs/useJobTracker.js";
 import { SkuDrawer } from "./SkuDrawer.jsx";
@@ -24,7 +34,8 @@ export default function OptimizationPage() {
     refetch();
   });
 
-  const [startOptimization, { isLoading: isStarting }] = useStartOptimizationMutation();
+  const [startOptimization, { isLoading: isStarting }] =
+    useStartOptimizationMutation();
   const [selectedSkuForDrawer, setSelectedSkuForDrawer] = useState(null);
 
   const canRun =
@@ -56,33 +67,52 @@ export default function OptimizationPage() {
     <div className="flex flex-col gap-6 max-w-6xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">Safety Stock & Reorder Point Optimization</h2>
+          <h2 className="text-xl font-bold text-white tracking-tight">
+            Safety Stock & Reorder Point Optimization
+          </h2>
           <p className="text-xs text-slate-400 mt-1">
-            Compare deterministic normal safety stocks against uncertainty-aware empirical quantile reorder points.
+            Compare deterministic normal safety stocks against uncertainty-aware
+            empirical quantile reorder points.
           </p>
         </div>
 
         {canRun && (
           <button
             type="button"
-            disabled={isStarting || (job && (job.status === "queued" || job.status === "running"))}
+            disabled={
+              isStarting ||
+              (job && (job.status === "queued" || job.status === "running"))
+            }
             onClick={handleRunOptimization}
             className="flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-semibold text-white shadow-md shadow-indigo-700/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all self-start"
           >
-            {isStarting ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+            {isStarting ? (
+              <Loader2 size={14} className="animate-spin" />
+            ) : (
+              <Play size={14} />
+            )}
             <span>{optData ? "Re-run Optimization" : "Run Optimization"}</span>
           </button>
         )}
       </div>
 
-      {jobId && <JobProgress sessionId={session.id} job={job} onRetry={handleRunOptimization} />}
+      {jobId && (
+        <JobProgress
+          sessionId={session.id}
+          job={job}
+          onRetry={handleRunOptimization}
+        />
+      )}
 
       {/* Stale Warning Banner */}
       {optData?.stale && (
         <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 flex items-center justify-between gap-4 text-xs text-amber-300">
           <div className="flex items-center gap-2">
             <AlertTriangle size={16} className="shrink-0" />
-            <span>These results use older assumptions. Run optimization again to apply the latest parameters.</span>
+            <span>
+              These results use older assumptions. Run optimization again to
+              apply the latest parameters.
+            </span>
           </div>
           <button
             type="button"
@@ -104,13 +134,28 @@ export default function OptimizationPage() {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-slate-400 leading-relaxed">
           <div className="flex flex-col gap-2">
-            <p><strong className="text-slate-200">Order Quantity:</strong> {COPY.eoqDef}</p>
-            <p><strong className="text-slate-200">Deterministic ROP:</strong> {COPY.deterministicDef}</p>
-            <p><strong className="text-slate-200">Normal Approx:</strong> {COPY.normalApprox}</p>
+            <p>
+              <strong className="text-slate-200">Order Quantity:</strong>{" "}
+              {COPY.eoqDef}
+            </p>
+            <p>
+              <strong className="text-slate-200">Deterministic ROP:</strong>{" "}
+              {COPY.deterministicDef}
+            </p>
+            <p>
+              <strong className="text-slate-200">Normal Approx:</strong>{" "}
+              {COPY.normalApprox}
+            </p>
           </div>
           <div className="flex flex-col gap-2">
-            <p><strong className="text-slate-200">Uncertainty-Aware ROP:</strong> {COPY.uncertaintyDef}</p>
-            <p><strong className="text-slate-200">Policy Neutrality:</strong> {COPY.noSuperiority}</p>
+            <p>
+              <strong className="text-slate-200">Uncertainty-Aware ROP:</strong>{" "}
+              {COPY.uncertaintyDef}
+            </p>
+            <p>
+              <strong className="text-slate-200">Policy Neutrality:</strong>{" "}
+              {COPY.noSuperiority}
+            </p>
           </div>
         </div>
       </div>
@@ -120,24 +165,42 @@ export default function OptimizationPage() {
         <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-4 flex flex-wrap items-center justify-between gap-4 text-xs">
           <div className="flex items-center gap-6">
             <div>
-              <span className="text-slate-500 text-[11px]">Assumptions Version:</span>
-              <span className="font-mono text-slate-200 ml-1.5 font-bold">v{assumptions.version}</span>
+              <span className="text-slate-500 text-[11px]">
+                Assumptions Version:
+              </span>
+              <span className="font-mono text-slate-200 ml-1.5 font-bold">
+                v{assumptions.version}
+              </span>
             </div>
             <div>
-              <span className="text-slate-500 text-[11px]">Ordering Cost (S):</span>
-              <span className="font-mono text-slate-200 ml-1.5">{fmtInr(assumptions.orderingCost)}</span>
+              <span className="text-slate-500 text-[11px]">
+                Ordering Cost (S):
+              </span>
+              <span className="font-mono text-slate-200 ml-1.5">
+                {fmtInr(assumptions.orderingCost)}
+              </span>
             </div>
             <div>
-              <span className="text-slate-500 text-[11px]">Daily Holding (H):</span>
-              <span className="font-mono text-slate-200 ml-1.5">{fmtInr(assumptions.holdingCostPerUnitPerDay, true)}</span>
+              <span className="text-slate-500 text-[11px]">
+                Daily Holding (H):
+              </span>
+              <span className="font-mono text-slate-200 ml-1.5">
+                {fmtInr(assumptions.holdingCostPerUnitPerDay, true)}
+              </span>
             </div>
             <div>
               <span className="text-slate-500 text-[11px]">Lead Time:</span>
-              <span className="font-mono text-slate-200 ml-1.5">{assumptions.leadTimeDays} days</span>
+              <span className="font-mono text-slate-200 ml-1.5">
+                {assumptions.leadTimeDays} days
+              </span>
             </div>
             <div>
-              <span className="text-slate-500 text-[11px]">Service Target:</span>
-              <span className="font-mono text-slate-200 ml-1.5">{fmtPct(assumptions.targetServiceLevel, 0)}</span>
+              <span className="text-slate-500 text-[11px]">
+                Service Target:
+              </span>
+              <span className="font-mono text-slate-200 ml-1.5">
+                {fmtPct(assumptions.targetServiceLevel, 0)}
+              </span>
             </div>
           </div>
         </div>
@@ -148,8 +211,13 @@ export default function OptimizationPage() {
         <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col gap-4 shadow-xl">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-xs font-semibold text-slate-200">Replenishment Recommendations by SKU</h3>
-              <p className="text-[11px] text-slate-400 mt-0.5">Click any row or risk badge to open detailed intermediates and percentiles.</p>
+              <h3 className="text-xs font-semibold text-slate-200">
+                Replenishment Recommendations by SKU
+              </h3>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Click any row or risk badge to open detailed intermediates and
+                percentiles.
+              </p>
             </div>
           </div>
 
@@ -157,15 +225,39 @@ export default function OptimizationPage() {
             <table className="w-full text-left text-xs font-mono">
               <thead>
                 <tr className="border-b border-white/[0.06] text-slate-500 bg-white/[0.01]">
-                  <th scope="col" className="px-3 py-2.5 font-sans">SKU</th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-sans">Avg Daily Demand</th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-sans">Annual Demand</th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-sans text-indigo-400">EOQ (Units)</th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-sans">Exp Lead Demand</th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-sans">ROP Deterministic</th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-sans text-emerald-400">ROP Uncertainty-Aware</th>
-                  <th scope="col" className="px-3 py-2.5 text-right font-sans">Gap (Emp - Det)</th>
-                  <th scope="col" className="px-3 py-2.5 font-sans text-center">Risk Screen</th>
+                  <th scope="col" className="px-3 py-2.5 font-sans">
+                    SKU
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-sans">
+                    Avg Daily Demand
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-sans">
+                    Annual Demand
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-2.5 text-right font-sans text-indigo-400"
+                  >
+                    EOQ (Units)
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-sans">
+                    Exp Lead Demand
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-sans">
+                    ROP Deterministic
+                  </th>
+                  <th
+                    scope="col"
+                    className="px-3 py-2.5 text-right font-sans text-emerald-400"
+                  >
+                    ROP Uncertainty-Aware
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 text-right font-sans">
+                    Gap (Emp - Det)
+                  </th>
+                  <th scope="col" className="px-3 py-2.5 font-sans text-center">
+                    Risk Screen
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.02] text-slate-300">
@@ -179,17 +271,35 @@ export default function OptimizationPage() {
                       onClick={() => setSelectedSkuForDrawer(sku)}
                       className="hover:bg-white/[0.02] cursor-pointer transition-colors"
                     >
-                      <td className="px-3 py-3 font-medium text-slate-100">{sku.sku_id}</td>
-                      <td className="px-3 py-3 text-right">{fmtNum(sku.avg_daily_forecast, 1)}</td>
-                      <td className="px-3 py-3 text-right">{fmtNum(sku.annual_demand, 0)}</td>
-                      <td className="px-3 py-3 text-right font-bold text-indigo-300">{sku.eoq}</td>
-                      <td className="px-3 py-3 text-right">{fmtNum(sku.mu_l, 1)}</td>
-                      <td className="px-3 py-3 text-right font-semibold text-slate-200">{sku.rop_deterministic}</td>
-                      <td className="px-3 py-3 text-right font-bold text-emerald-300">{sku.rop_uncertainty_aware}</td>
+                      <td className="px-3 py-3 font-medium text-slate-100">
+                        {sku.sku_id}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        {fmtNum(sku.avg_daily_forecast, 1)}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        {fmtNum(sku.annual_demand, 0)}
+                      </td>
+                      <td className="px-3 py-3 text-right font-bold text-indigo-300">
+                        {sku.eoq}
+                      </td>
+                      <td className="px-3 py-3 text-right">
+                        {fmtNum(sku.mu_l, 1)}
+                      </td>
+                      <td className="px-3 py-3 text-right font-semibold text-slate-200">
+                        {sku.rop_deterministic}
+                      </td>
+                      <td className="px-3 py-3 text-right font-bold text-emerald-300">
+                        {sku.rop_uncertainty_aware}
+                      </td>
                       <td className="px-3 py-3 text-right">
                         <span
                           className={`font-semibold ${
-                            gap > 0 ? "text-amber-400" : gap < 0 ? "text-indigo-400" : "text-slate-400"
+                            gap > 0
+                              ? "text-amber-400"
+                              : gap < 0
+                                ? "text-indigo-400"
+                                : "text-slate-400"
                           }`}
                         >
                           {gap > 0 ? `+${gap}` : gap}
@@ -201,8 +311,8 @@ export default function OptimizationPage() {
                             rk?.level === "high"
                               ? "bg-rose-500/20 text-rose-300"
                               : rk?.level === "medium"
-                              ? "bg-amber-500/20 text-amber-300"
-                              : "bg-emerald-500/20 text-emerald-300"
+                                ? "bg-amber-500/20 text-amber-300"
+                                : "bg-emerald-500/20 text-emerald-300"
                           }`}
                         >
                           {rk?.level || "low"}
@@ -218,11 +328,17 @@ export default function OptimizationPage() {
           {/* Ineligible SKUs section */}
           {ineligibleSkus.length > 0 && (
             <div className="mt-4 pt-3 border-t border-white/[0.06] flex flex-col gap-2">
-              <span className="text-xs font-semibold text-slate-400">Ineligible SKUs</span>
+              <span className="text-xs font-semibold text-slate-400">
+                Ineligible SKUs
+              </span>
               <ul className="text-xs text-slate-500 flex flex-col gap-1">
                 {ineligibleSkus.map((s) => (
                   <li key={s.sku_id}>
-                    <strong className="font-mono text-slate-300">{s.sku_id}</strong>: {s.ineligible_reason?.replace(/_/g, " ")} — {s.warnings?.[0]}
+                    <strong className="font-mono text-slate-300">
+                      {s.sku_id}
+                    </strong>
+                    : {s.ineligible_reason?.replace(/_/g, " ")} —{" "}
+                    {s.warnings?.[0]}
                   </li>
                 ))}
               </ul>

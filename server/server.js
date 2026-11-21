@@ -4,13 +4,16 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import helmet from "helmet";
 import { getEnv } from "./src/config/env.js";
-import { logger } from "./src/lib/logger.js";
 import { requestContext } from "./src/middlewares/requestContext.js";
 import { connectDatabase } from "./src/config/db.js";
-import { errorHandler, notFoundHandler } from "./src/middlewares/errorHandler.js";
+import {
+  errorHandler,
+  notFoundHandler,
+} from "./src/middlewares/errorHandler.js";
 import { recoverInterruptedJobs } from "./src/services/jobRunner.js";
 import v1Router from "./src/routes/v1/index.js";
 import legacyApp from "./src/app.js";
+import morgan from "morgan";
 
 // (a) call getEnv() first (fail fast)
 const env = getEnv();
@@ -19,12 +22,15 @@ const server = express();
 
 // (b) requestContext as the first middleware
 server.use(requestContext);
+server.use(morgan("dev"));
 
 // (c) helmet()
 server.use(helmet());
 
 // (d) CORS allowlist from CORS_ORIGINS
-const allowedOrigins = env.CORS_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean);
+const allowedOrigins = env.CORS_ORIGINS.split(",")
+  .map((s) => s.trim())
+  .filter(Boolean);
 server.use(
   cors({
     origin: (origin, callback) => {
@@ -48,7 +54,6 @@ server.use("/api/v1", legacyApp);
 // (f) mount v1Router at /api/v1 (health check and new v1 routes)
 server.use("/api/v1", v1Router);
 
-
 // (g) at the end add notFoundHandler then errorHandler
 server.use(notFoundHandler);
 server.use(errorHandler);
@@ -58,7 +63,7 @@ const port = env.PORT;
 server.listen(port, async () => {
   await connectDatabase();
   await recoverInterruptedJobs();
-  logger.info(`Backend Service is running on port ${port}`);
+  console.log(`Backend Service is running on port ${port}`);
 });
 
 export default server;

@@ -1,8 +1,17 @@
 import { useState } from "react";
 import { Link, useNavigate, useOutletContext } from "react-router-dom";
-import { Archive, ArchiveRestore, ArrowUpRight, Sparkles, Trash2 } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  ArrowUpRight,
+  Sparkles,
+  Trash2,
+} from "lucide-react";
 import { fmtDateTime, shortId } from "../../lib/format.js";
-import { useDeleteSessionMutation, usePatchSessionMutation } from "../../lib/api.js";
+import {
+  useDeleteSessionMutation,
+  usePatchSessionMutation,
+} from "../../lib/api.js";
 
 const AI_ELIGIBLE_STATUSES = [
   "forecast_ready",
@@ -33,7 +42,11 @@ export default function OverviewPage() {
       await deleteSession(session.id).unwrap();
       navigate("/sessions");
     } catch (err) {
-      setDeleteError(err?.message || err?.data?.error?.message || "Failed to delete session.");
+      setDeleteError(
+        err?.message ||
+          err?.data?.error?.message ||
+          "Failed to delete session.",
+      );
     }
   };
 
@@ -80,19 +93,22 @@ export default function OverviewPage() {
     aiIndexStatus === "indexed"
       ? "AI can retrieve this session"
       : aiIndexStatus === "pending"
-      ? "Preparing AI context"
-      : aiIndexStatus === "failed"
-      ? "AI retrieval unavailable; deterministic results are unaffected"
-      : "Not indexed yet";
+        ? "Preparing AI context"
+        : aiIndexStatus === "failed"
+          ? "AI retrieval unavailable; deterministic results are unaffected"
+          : "Not indexed yet";
 
   return (
     <div className="flex flex-col gap-8 max-w-5xl mx-auto">
       {/* Overview Header Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-xl font-bold text-white tracking-tight">Analysis Overview</h2>
+          <h2 className="text-xl font-bold text-white tracking-tight">
+            Analysis Overview
+          </h2>
           <p className="text-xs text-slate-400 mt-0.5">
-            Full stage status summary, active model run identifiers, and AI contextual index state.
+            Full stage status summary, active model run identifiers, and AI
+            contextual index state.
           </p>
         </div>
 
@@ -140,14 +156,16 @@ export default function OverviewPage() {
       {/* AI Index Status Bar */}
       <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-4 flex items-center justify-between gap-4 text-xs">
         <div className="flex items-center gap-3">
-          <span className="text-slate-400 font-medium">AI Retrieval Index:</span>
+          <span className="text-slate-400 font-medium">
+            AI Retrieval Index:
+          </span>
           <span
             className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium uppercase ${
               aiIndexStatus === "indexed"
                 ? "bg-emerald-500/20 text-emerald-300"
                 : aiIndexStatus === "pending"
-                ? "bg-amber-500/20 text-amber-300"
-                : "bg-slate-800 text-slate-400"
+                  ? "bg-amber-500/20 text-amber-300"
+                  : "bg-slate-800 text-slate-400"
             }`}
           >
             {aiIndexStatus}
@@ -155,7 +173,9 @@ export default function OverviewPage() {
           <span className="text-slate-500 text-[11px]">{aiExplanation}</span>
         </div>
         {session.aiIndex?.updatedAt && (
-          <span className="text-slate-500 text-[11px]">Last indexed {fmtDateTime(session.aiIndex.updatedAt)}</span>
+          <span className="text-slate-500 text-[11px]">
+            Last indexed {fmtDateTime(session.aiIndex.updatedAt)}
+          </span>
         )}
       </div>
 
@@ -174,16 +194,18 @@ export default function OverviewPage() {
             >
               <div className="flex flex-col gap-2">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-200">{stg.title}</h3>
+                  <h3 className="text-sm font-semibold text-slate-200">
+                    {stg.title}
+                  </h3>
                   <span
                     className={`px-2 py-0.5 rounded text-[10px] font-semibold uppercase ${
                       isSucceeded
                         ? "bg-emerald-500/15 text-emerald-300 border border-emerald-500/20"
                         : isFailed
-                        ? "bg-rose-500/15 text-rose-300 border border-rose-500/20"
-                        : isRunning
-                        ? "bg-amber-500/15 text-amber-300 border border-amber-500/20 animate-pulse"
-                        : "bg-slate-800 text-slate-400"
+                          ? "bg-rose-500/15 text-rose-300 border border-rose-500/20"
+                          : isRunning
+                            ? "bg-amber-500/15 text-amber-300 border border-amber-500/20 animate-pulse"
+                            : "bg-slate-800 text-slate-400"
                     }`}
                   >
                     {st.replace(/_/g, " ")}
@@ -193,8 +215,12 @@ export default function OverviewPage() {
                 <div className="flex flex-col gap-1 text-xs text-slate-400 font-mono mt-1">
                   {stg.runId && (
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-500 font-sans">Active Run:</span>
-                      <span className="text-slate-200">{shortId(stg.runId)}</span>
+                      <span className="text-slate-500 font-sans">
+                        Active Run:
+                      </span>
+                      <span className="text-slate-200">
+                        {shortId(stg.runId)}
+                      </span>
                     </div>
                   )}
                   {stg.record?.startedAt && (
@@ -205,7 +231,9 @@ export default function OverviewPage() {
                   )}
                   {stg.record?.finishedAt && (
                     <div className="flex items-center justify-between">
-                      <span className="text-slate-500 font-sans">Finished:</span>
+                      <span className="text-slate-500 font-sans">
+                        Finished:
+                      </span>
                       <span>{fmtDateTime(stg.record.finishedAt)}</span>
                     </div>
                   )}
@@ -246,13 +274,23 @@ export default function OverviewPage() {
             </div>
 
             <p className="text-xs text-slate-300 leading-relaxed">
-              This action is <strong className="text-rose-400">permanent and irrecoverable</strong>. All datasets, forecasts, assumptions, optimization recommendations, simulation results, and AI conversation history will be permanently deleted.
+              This action is{" "}
+              <strong className="text-rose-400">
+                permanent and irrecoverable
+              </strong>
+              . All datasets, forecasts, assumptions, optimization
+              recommendations, simulation results, and AI conversation history
+              will be permanently deleted.
             </p>
 
             <form onSubmit={handleDelete} className="flex flex-col gap-3 mt-1">
               <div className="flex flex-col gap-1 text-xs">
                 <label className="text-slate-400">
-                  Please type <span className="font-mono text-white select-all">"{session.name}"</span> to confirm:
+                  Please type{" "}
+                  <span className="font-mono text-white select-all">
+                    "{session.name}"
+                  </span>{" "}
+                  to confirm:
                 </label>
                 <input
                   type="text"

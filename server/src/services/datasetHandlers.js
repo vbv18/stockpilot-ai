@@ -2,8 +2,16 @@ import { parse } from "csv-parse";
 import { z } from "zod";
 import { MAX_SKUS_PER_SESSION } from "../config/constants.js";
 import { SkuId } from "../contracts/common.js";
-import { TransformationConfig, ValidationSummary } from "../contracts/dataset.js";
-import { dayIndexFromIso, isoFromDayIndex, parseDateToIso, parseQuantity } from "../lib/csvDate.js";
+import {
+  TransformationConfig,
+  ValidationSummary,
+} from "../contracts/dataset.js";
+import {
+  dayIndexFromIso,
+  isoFromDayIndex,
+  parseDateToIso,
+  parseQuantity,
+} from "../lib/csvDate.js";
 import { AppError } from "../lib/errors.js";
 import { getStorage } from "../lib/storage.js";
 import { DatasetModel } from "../models/dataset.model.js";
@@ -14,7 +22,10 @@ import { setStage, transition } from "./sessionService.js";
 registerJobHandler("validation", {
   async run(ctx) {
     const { datasetId, mapping } = ctx.input;
-    const dataset = await DatasetModel.findOne({ _id: datasetId, userId: ctx.userId });
+    const dataset = await DatasetModel.findOne({
+      _id: datasetId,
+      userId: ctx.userId,
+    });
     if (!dataset) {
       throw new AppError("NOT_FOUND", "Dataset not found");
     }
@@ -68,14 +79,20 @@ registerJobHandler("validation", {
         qtyColIdx = header.indexOf(mapping.quantityColumn);
 
         if (skuColIdx === -1 || dateColIdx === -1 || qtyColIdx === -1) {
-          throw new AppError("UNPROCESSABLE", "Mapped columns not found in header");
+          throw new AppError(
+            "UNPROCESSABLE",
+            "Mapped columns not found in header",
+          );
         }
         continue;
       }
 
       totalDataRows++;
       if (totalDataRows > 600_000) {
-        throw new AppError("DATASET_VALIDATION_FAILED", "The file has more rows than the allowed maximum.");
+        throw new AppError(
+          "DATASET_VALIDATION_FAILED",
+          "The file has more rows than the allowed maximum.",
+        );
       }
 
       if (record.length !== header.length) {
@@ -151,7 +168,9 @@ registerJobHandler("validation", {
 
       const spanDays = skuMaxDay >= skuMinDay ? skuMaxDay - skuMinDay + 1 : 1;
       const activeDays = dayMap.size;
-      const coveragePct = Number(Math.round((activeDays / spanDays) * 10000) / 100);
+      const coveragePct = Number(
+        Math.round((activeDays / spanDays) * 10000) / 100,
+      );
 
       topSkuCoverageList.push({
         skuId: sku,
@@ -177,7 +196,10 @@ registerJobHandler("validation", {
     const distinctSkus = skuMap.size;
     const calendarDaysInRange = minDay <= maxDay ? maxDay - minDay + 1 : 0;
     const daysWithAnyRecord = distinctDayIndices.size;
-    const missingCalendarDays = Math.max(0, calendarDaysInRange - daysWithAnyRecord);
+    const missingCalendarDays = Math.max(
+      0,
+      calendarDaysInRange - daysWithAnyRecord,
+    );
     const rejectedRows =
       rejectedByReason.invalid_sku +
       rejectedByReason.invalid_date +
@@ -187,17 +209,27 @@ registerJobHandler("validation", {
 
     const warnings = [];
     if (missingCalendarDays > 0) {
-      warnings.push(`${missingCalendarDays} calendar days in the date range have no records for any SKU. Confirming zero-fill treats them as zero demand.`);
+      warnings.push(
+        `${missingCalendarDays} calendar days in the date range have no records for any SKU. Confirming zero-fill treats them as zero demand.`,
+      );
     }
     if (duplicateSkuDateRecords > 0) {
-      warnings.push(`${duplicateSkuDateRecords} duplicate SKU/date records will be summed into one daily total.`);
+      warnings.push(
+        `${duplicateSkuDateRecords} duplicate SKU/date records will be summed into one daily total.`,
+      );
     }
     if (droppedNegativeRows > 0) {
-      warnings.push(`${droppedNegativeRows} negative-quantity rows will be excluded (treated as returns, not demand).`);
+      warnings.push(
+        `${droppedNegativeRows} negative-quantity rows will be excluded (treated as returns, not demand).`,
+      );
     }
-    const nonNegativeRejections = rejectedRows - (mapping.negativeQuantityPolicy === "drop" ? droppedNegativeRows : 0);
+    const nonNegativeRejections =
+      rejectedRows -
+      (mapping.negativeQuantityPolicy === "drop" ? droppedNegativeRows : 0);
     if (nonNegativeRejections > 0) {
-      warnings.push(`${nonNegativeRejections} rows were rejected because of invalid values.`);
+      warnings.push(
+        `${nonNegativeRejections} rows were rejected because of invalid values.`,
+      );
     }
 
     const summaryObj = {
@@ -210,7 +242,10 @@ registerJobHandler("validation", {
       zeroQuantityRows,
       duplicateSkuDateRecords,
       distinctSkus,
-      dateRange: minDay <= maxDay ? { min: isoFromDayIndex(minDay), max: isoFromDayIndex(maxDay) } : null,
+      dateRange:
+        minDay <= maxDay
+          ? { min: isoFromDayIndex(minDay), max: isoFromDayIndex(maxDay) }
+          : null,
       calendarDaysInRange,
       daysWithAnyRecord,
       missingCalendarDays,
@@ -234,7 +269,10 @@ registerJobHandler("validation", {
     });
 
     const aggKey = `datasets/${ctx.userId}/${ctx.sessionId}/${datasetId}/aggregated.json`;
-    const aggRef = await storage.putBuffer(aggKey, Buffer.from(aggregatedPayload, "utf-8"));
+    const aggRef = await storage.putBuffer(
+      aggKey,
+      Buffer.from(aggregatedPayload, "utf-8"),
+    );
 
     dataset.validationSummary = validatedSummary;
     dataset.aggregatedFileRef = aggRef;
@@ -249,20 +287,27 @@ registerJobHandler("validation", {
       dataset.status = "validation_failed";
       dataset.error = {
         code: "DATASET_VALIDATION_FAILED",
-        message: "No valid rows were found. Check the column mapping and date format.",
+        message:
+          "No valid rows were found. Check the column mapping and date format.",
       };
       await dataset.save();
       throw new AppError("DATASET_VALIDATION_FAILED", dataset.error.message);
     }
 
-    if (mapping.negativeQuantityPolicy === "reject" && negativeQuantityRows > 0) {
+    if (
+      mapping.negativeQuantityPolicy === "reject" &&
+      negativeQuantityRows > 0
+    ) {
       dataset.status = "validation_failed";
       dataset.error = {
         code: "NEGATIVE_QUANTITY_POLICY_REQUIRED",
         message: `${negativeQuantityRows} rows have negative quantities. Choose 'exclude negative rows' to continue; they will be treated as returns, not demand.`,
       };
       await dataset.save();
-      throw new AppError("NEGATIVE_QUANTITY_POLICY_REQUIRED", dataset.error.message);
+      throw new AppError(
+        "NEGATIVE_QUANTITY_POLICY_REQUIRED",
+        dataset.error.message,
+      );
     }
 
     dataset.status = "validated";
@@ -284,7 +329,9 @@ registerJobHandler("validation", {
         },
       },
     );
-    await transition(ctx.userId, ctx.sessionId, "validation_failed").catch(() => {});
+    await transition(ctx.userId, ctx.sessionId, "validation_failed").catch(
+      () => {},
+    );
     await setStage(ctx.userId, ctx.sessionId, "dataset", {
       status: "failed",
       errorCode: failure.code,
@@ -310,7 +357,10 @@ registerJobHandler("validation", {
 registerJobHandler("transformation", {
   async run(ctx) {
     const { datasetId } = ctx.input;
-    const dataset = await DatasetModel.findOne({ _id: datasetId, userId: ctx.userId });
+    const dataset = await DatasetModel.findOne({
+      _id: datasetId,
+      userId: ctx.userId,
+    });
     if (!dataset) {
       throw new AppError("NOT_FOUND", "Dataset not found");
     }
@@ -357,7 +407,8 @@ registerJobHandler("transformation", {
 
     for (const skuItem of keptSkus) {
       const pointMap = new Map(skuItem.points);
-      const firstDay = skuItem.points.length > 0 ? skuItem.points[0][0] : maxDay;
+      const firstDay =
+        skuItem.points.length > 0 ? skuItem.points[0][0] : maxDay;
 
       for (let dayIdx = firstDay; dayIdx <= maxDay; dayIdx++) {
         const dateStr = isoFromDayIndex(dayIdx);
@@ -370,7 +421,10 @@ registerJobHandler("transformation", {
     }
 
     const procKey = `datasets/${ctx.userId}/${ctx.sessionId}/${datasetId}/processed.csv`;
-    const procRef = await storage.putBuffer(procKey, Buffer.from(processedCsv, "utf-8"));
+    const procRef = await storage.putBuffer(
+      procKey,
+      Buffer.from(processedCsv, "utf-8"),
+    );
 
     const transConfigObj = {
       aggregation: "sum_by_sku_date",

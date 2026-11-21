@@ -56,5 +56,8 @@ const simulationRunSchema = new mongoose.Schema(
 
 simulationRunSchema.index({ userId: 1, sessionId: 1, createdAt: -1 });
 
-export const SimulationRunModel = mongoose.model("simulation_runs", simulationRunSchema);
+export const SimulationRunModel = mongoose.model(
+  "simulation_runs",
+  simulationRunSchema,
+);
 export default SimulationRunModel;

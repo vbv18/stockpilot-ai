@@ -94,5 +94,8 @@ analysisSessionSchema.index({ userId: 1, createdAt: -1 });
 analysisSessionSchema.index({ userId: 1, status: 1 });
 analysisSessionSchema.index({ userId: 1, archivedAt: 1 });
 
-export const AnalysisSessionModel = mongoose.model("analysis_sessions", analysisSessionSchema);
+export const AnalysisSessionModel = mongoose.model(
+  "analysis_sessions",
+  analysisSessionSchema,
+);
 export default AnalysisSessionModel;

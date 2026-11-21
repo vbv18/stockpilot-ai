@@ -1,9 +1,9 @@
 import { ZodError } from "zod";
 import { AppError, zodDetails } from "../lib/errors.js";
-import { logger } from "../lib/logger.js";
 
 export function errorHandler(err, req, res, next) {
-  const requestId = res.locals.requestId || req.headers["x-request-id"] || "unknown";
+  const requestId =
+    res.locals.requestId || req.headers["x-request-id"] || "unknown";
 
   if (err instanceof AppError) {
     return res.status(err.httpStatus).json({
@@ -51,7 +51,12 @@ export function errorHandler(err, req, res, next) {
   if (err && typeof err.statusCode === "number" && !err.httpStatus) {
     return res.status(err.statusCode).json({
       error: {
-        code: err.statusCode === 401 ? "UNAUTHENTICATED" : (err.statusCode === 404 ? "NOT_FOUND" : "INTERNAL_ERROR"),
+        code:
+          err.statusCode === 401
+            ? "UNAUTHENTICATED"
+            : err.statusCode === 404
+              ? "NOT_FOUND"
+              : "INTERNAL_ERROR",
         message: err.message,
         ...(err.details ? { details: err.details } : {}),
         requestId,
@@ -60,8 +65,7 @@ export function errorHandler(err, req, res, next) {
   }
 
   // Unknown / unhandled errors
-  const childLog = res.locals.log || logger;
-  childLog.error({ err, requestId }, "Unhandled internal error");
+  console.error("Unhandled internal error", { err, requestId });
 
   return res.status(500).json({
     error: {
@@ -73,7 +77,8 @@ export function errorHandler(err, req, res, next) {
 }
 
 export function notFoundHandler(req, res) {
-  const requestId = res.locals.requestId || req.headers["x-request-id"] || "unknown";
+  const requestId =
+    res.locals.requestId || req.headers["x-request-id"] || "unknown";
   return res.status(404).json({
     error: {
       code: "NOT_FOUND",

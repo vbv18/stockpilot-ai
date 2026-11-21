@@ -1,5 +1,8 @@
 import { AppError } from "../../../lib/errors.js";
-import { GetRiskSummaryInput, GetRiskSummaryOutput } from "../../../contracts/ai.js";
+import {
+  GetRiskSummaryInput,
+  GetRiskSummaryOutput,
+} from "../../../contracts/ai.js";
 import { buildSessionRisk } from "../../risk.js";
 
 /**
@@ -10,7 +13,10 @@ export async function getInventoryRiskSummary(rawArgs, bundle) {
   const { optimizationRun, simulationRun, assumptions } = bundle;
 
   if (!optimizationRun || !optimizationRun.result) {
-    throw new AppError("NOT_FOUND", "Optimization run not found for this session");
+    throw new AppError(
+      "NOT_FOUND",
+      "Optimization run not found for this session",
+    );
   }
 
   const targetServiceLevel = assumptions?.values?.targetServiceLevel ?? 0.95;
@@ -19,7 +25,8 @@ export async function getInventoryRiskSummary(rawArgs, bundle) {
   let rankedBy = args.rankBy;
   if (
     (!simulationRun || !simulationRun.result?.skus) &&
-    (rankedBy === "stockout_units_deterministic" || rankedBy === "stockout_units_uncertainty_aware")
+    (rankedBy === "stockout_units_deterministic" ||
+      rankedBy === "stockout_units_uncertainty_aware")
   ) {
     rankedBy = "risk_score";
   }
@@ -63,7 +70,8 @@ export async function getInventoryRiskSummary(rawArgs, bundle) {
     simulationAvailable: Boolean(simulationRun && simulationRun.result),
     items: topItems,
     countsByLevel,
-    criteria: "Risk flags are screening criteria, not predictions. Stockout tolerance = 1 minus the target service level.",
+    criteria:
+      "Risk flags are screening criteria, not predictions. Stockout tolerance = 1 minus the target service level.",
   });
 
   return {

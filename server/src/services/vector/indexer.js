@@ -1,5 +1,4 @@
 import { v5 as uuidv5 } from "uuid";
-import { logger } from "../../lib/logger.js";
 import { AnalysisSessionModel } from "../../models/analysisSession.model.js";
 import { loadSessionBundle } from "../ai/sessionBundle.js";
 import { buildArtifactDocs } from "./artifacts.js";
@@ -26,13 +25,21 @@ export function scheduleReindex(userId, sessionId, reason) {
     const timer = setTimeout(() => {
       pendingTimers.delete(key);
       reindexSession(userId, sessionId, reason).catch((err) => {
-        logger.error({ userId, sessionId, err: err.message }, "Background reindex failed");
+        console.error("Background reindex failed", {
+          userId,
+          sessionId,
+          err: err.message,
+        });
       });
     }, 500);
 
     pendingTimers.set(key, timer);
   } catch (err) {
-    logger.warn({ userId, sessionId, err: err.message }, "Error in scheduleReindex");
+    console.warn("Error in scheduleReindex", {
+      userId,
+      sessionId,
+      err: err.message,
+    });
   }
 }
 
@@ -64,7 +71,7 @@ export async function reindexSession(userId, sessionId, reason) {
     // 2. Check embedder
     const embedder = getEmbedder();
     if (!embedder) {
-      logger.info({ sessionId }, "Embedder not configured; skipping AI index");
+      console.log("Embedder not configured; skipping AI index", { sessionId });
       await AnalysisSessionModel.updateOne(
         { _id: sessionId, userId },
         {
@@ -81,7 +88,7 @@ export async function reindexSession(userId, sessionId, reason) {
     try {
       await verifyEmbedderDim(embedder);
     } catch (dimErr) {
-      logger.error({ err: dimErr.message }, "Embedder verification failed");
+      console.error("Embedder verification failed", { err: dimErr.message });
       await AnalysisSessionModel.updateOne(
         { _id: sessionId, userId },
         {
@@ -180,15 +187,25 @@ export async function reindexSession(userId, sessionId, reason) {
       },
     );
 
-    logger.info({ sessionId, pointsCount: points.length, version }, "Session reindexed successfully");
+    console.log("Session reindexed successfully", {
+      sessionId,
+      pointsCount: points.length,
+      version,
+    });
   } catch (err) {
-    logger.error({ sessionId, err: err.message }, "Error during session reindex");
+    console.error("Error during session reindex", {
+      sessionId,
+      err: err.message,
+    });
     await AnalysisSessionModel.updateOne(
       { _id: sessionId, userId },
       {
         $set: {
           "aiIndex.status": "failed",
-          "aiIndex.errorMessage": (err.message || "Indexing failed").slice(0, 200),
+          "aiIndex.errorMessage": (err.message || "Indexing failed").slice(
+            0,
+            200,
+          ),
           "aiIndex.updatedAt": new Date(),
         },
       },
@@ -198,7 +215,11 @@ export async function reindexSession(userId, sessionId, reason) {
     if (rerunRequested.has(sessionKey)) {
       rerunRequested.delete(sessionKey);
       reindexSession(userId, sessionId, "rerun_after_finish").catch((err) => {
-        logger.error({ userId, sessionId, err: err.message }, "Follow-up reindex failed");
+        console.error("Follow-up reindex failed", {
+          userId,
+          sessionId,
+          err: err.message,
+        });
       });
     }
   }

@@ -1,9 +1,13 @@
 # REPO MAP
+
 ## Paths
+
 CLIENT_DIR=client
 SERVER_DIR=server
 STATS_DIR=stats-service
+
 ## Server
+
 PACKAGE_MANAGER=npm
 NODE_VERSION=v26.10.0
 MODULE_SYSTEM=ESM
@@ -25,7 +29,9 @@ MONGO_URI_ENV_VAR=MONGO_URI
 LOGGER=morgan (console)
 ERROR_HANDLER_FILE=src/middlewares/error.middleware.js
 ENV_LOADING=dotenv
+
 ## Client
+
 PACKAGE_MANAGER=npm
 VITE_VERSION=8.3.6
 TAILWIND_VERSION=4.3.5
@@ -40,10 +46,14 @@ GET_ID_TOKEN=(await loginData.user.getIdToken()) or (await auth.currentUser.getI
 API_CLIENT_FILE=src/utils/axios.js (export const api)
 UI_PRIMITIVES=Lucide icons, FcGoogle, inline Tailwind classes with dark palette (#0d0f14, #13151c, border-white/[0.08])
 RECHARTS_INSTALLED=false
+
 ## Baseline
+
 SERVER_BUILD_STATUS=pass
 CLIENT_BUILD_STATUS=pass
 PRE_EXISTING_ERRORS=none
+
 ## Tooling
+
 PYTHON_VERSION=Python 3.11.7
 DOCKER=Docker version 29.7.2, Docker Compose version v5.3.1

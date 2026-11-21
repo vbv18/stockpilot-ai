@@ -35,9 +35,11 @@ function toJobDto(d) {
   };
 }
 
-const JobQuery = z.object({
-  stage: JobStage.optional(),
-}).strict();
+const JobQuery = z
+  .object({
+    stage: JobStage.optional(),
+  })
+  .strict();
 
 const JobIdParam = IdParam.extend({
   jobId: z.string().regex(/^[a-fA-F0-9]{24}$/),

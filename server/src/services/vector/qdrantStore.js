@@ -1,7 +1,6 @@
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { getEnv } from "../../config/env.js";
 import { AppError } from "../../lib/errors.js";
-import { logger } from "../../lib/logger.js";
 
 export const COLLECTION_NAME = "stockpilot_session_artifacts";
 
@@ -29,7 +28,9 @@ export async function ensureCollection(dim) {
 
   try {
     const collectionsRes = await qdrant.getCollections();
-    const exists = collectionsRes.collections.some((c) => c.name === COLLECTION_NAME);
+    const exists = collectionsRes.collections.some(
+      (c) => c.name === COLLECTION_NAME,
+    );
 
     if (!exists) {
       await qdrant.createCollection(COLLECTION_NAME, {
@@ -49,24 +50,34 @@ export async function ensureCollection(dim) {
             wait: true,
           });
         } catch (idxErr) {
-          logger.warn({ field, err: idxErr.message }, "Could not create payload index (may exist)");
+          console.warn("Could not create payload index (may exist)", {
+            field,
+            err: idxErr.message,
+          });
         }
       }
     } else {
       const info = await qdrant.getCollection(COLLECTION_NAME);
       const vectorSize = info.config?.params?.vectors?.size;
       if (vectorSize && vectorSize !== dim) {
-        throw new AppError("UPSTREAM_VECTOR_ERROR", "Vector collection dimension mismatch");
+        throw new AppError(
+          "UPSTREAM_VECTOR_ERROR",
+          "Vector collection dimension mismatch",
+        );
       }
     }
 
     collectionEnsured = true;
   } catch (err) {
     if (err instanceof AppError) throw err;
-    logger.error({ err: err.message }, "Failed to ensure Qdrant collection");
-    throw new AppError("UPSTREAM_VECTOR_ERROR", "Semantic retrieval is unavailable.", {
-      retryable: true,
-    });
+    console.error("Failed to ensure Qdrant collection", { err: err.message });
+    throw new AppError(
+      "UPSTREAM_VECTOR_ERROR",
+      "Semantic retrieval is unavailable.",
+      {
+        retryable: true,
+      },
+    );
   }
 }
 
@@ -87,10 +98,14 @@ export async function upsertPoints(points) {
       });
     }
   } catch (err) {
-    logger.error({ err: err.message }, "Failed to upsert points in Qdrant");
-    throw new AppError("UPSTREAM_VECTOR_ERROR", "Semantic retrieval is unavailable.", {
-      retryable: true,
-    });
+    console.error("Failed to upsert points in Qdrant", { err: err.message });
+    throw new AppError(
+      "UPSTREAM_VECTOR_ERROR",
+      "Semantic retrieval is unavailable.",
+      {
+        retryable: true,
+      },
+    );
   }
 }
 
@@ -111,7 +126,10 @@ export async function deleteStale(userId, sessionId, keepVersion) {
       },
     });
   } catch (err) {
-    logger.warn({ err: err.message, sessionId }, "Failed to delete stale points in Qdrant");
+    console.warn("Failed to delete stale points in Qdrant", {
+      err: err.message,
+      sessionId,
+    });
   }
 }
 
@@ -131,10 +149,17 @@ export async function deleteSession(userId, sessionId) {
       },
     });
   } catch (err) {
-    logger.error({ err: err.message, sessionId }, "Failed to delete session points in Qdrant");
-    throw new AppError("UPSTREAM_VECTOR_ERROR", "Semantic retrieval is unavailable.", {
-      retryable: true,
+    console.error("Failed to delete session points in Qdrant", {
+      err: err.message,
+      sessionId,
     });
+    throw new AppError(
+      "UPSTREAM_VECTOR_ERROR",
+      "Semantic retrieval is unavailable.",
+      {
+        retryable: true,
+      },
+    );
   }
 }
 
@@ -153,8 +178,8 @@ export async function search({ userId, sessionId, vector, limit = 8, skuId }) {
   }
 
   try {
-    const results = await qdrant.search(COLLECTION_NAME, {
-      vector,
+    const results = await qdrant.query(COLLECTION_NAME, {
+      query: vector,
       limit,
       filter: {
         must: mustConditions,
@@ -162,14 +187,22 @@ export async function search({ userId, sessionId, vector, limit = 8, skuId }) {
       with_payload: true,
     });
 
-    return results.map((r) => ({
+    const points = results.points || results || [];
+    return points.map((r) => ({
       score: r.score,
       payload: r.payload,
     }));
   } catch (err) {
-    logger.error({ err: err.message, sessionId }, "Failed to search points in Qdrant");
-    throw new AppError("UPSTREAM_VECTOR_ERROR", "Semantic retrieval is unavailable.", {
-      retryable: true,
+    console.error("Failed to search points in Qdrant", {
+      err: err.message,
+      sessionId,
     });
+    throw new AppError(
+      "UPSTREAM_VECTOR_ERROR",
+      "Semantic retrieval is unavailable.",
+      {
+        retryable: true,
+      },
+    );
   }
 }

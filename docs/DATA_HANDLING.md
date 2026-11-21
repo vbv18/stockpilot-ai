@@ -1,6 +1,7 @@
 # Data Handling & Privacy Policy
 
 ## Session Data Deletion
+
 - **User-Initiated & Permanent:** Session deletion via `DELETE /api/v1/sessions/:sessionId` is permanent and irrecoverable. There is no automated expiry or soft-deletion recycle bin once deleted.
 - **Cascading Removal:** Deleting a session permanently purges:
   1. Semantic vector points in Qdrant (filtered by `user_id` and `session_id`).
@@ -9,5 +10,6 @@
 - **Third-Party Backups & Provider Logs:** Server backups, disaster recovery snapshots, and external AI provider request logs (e.g., Google, OpenAI, Anthropic, Groq) are subject to their respective data retention policies and outside the app's direct control.
 
 ## Data Isolation & Security
+
 - Every data access and database query is scoped strictly to the authenticated `userId`.
 - No raw customer demand CSV rows are ever forwarded to LLMs; only aggregated statistical summaries and numerical calculation tool outputs are provided in model contexts.

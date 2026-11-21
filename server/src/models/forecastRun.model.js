@@ -61,5 +61,8 @@ const forecastRunSchema = new mongoose.Schema(
 
 forecastRunSchema.index({ userId: 1, sessionId: 1, createdAt: -1 });
 
-export const ForecastRunModel = mongoose.model("forecast_runs", forecastRunSchema);
+export const ForecastRunModel = mongoose.model(
+  "forecast_runs",
+  forecastRunSchema,
+);
 export default ForecastRunModel;

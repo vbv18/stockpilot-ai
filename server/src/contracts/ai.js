@@ -33,15 +33,24 @@ export const GetSkuForecastInput = z
   })
   .strict();
 
-export const GetInventoryRecommendationInput = z.object({ skuId: SkuId }).strict();
-export const CompareInventoryPoliciesInput = z.object({ skuId: SkuId.optional() }).strict();
+export const GetInventoryRecommendationInput = z
+  .object({ skuId: SkuId })
+  .strict();
+export const CompareInventoryPoliciesInput = z
+  .object({ skuId: SkuId.optional() })
+  .strict();
 
 export const WhatIfOverrides = z
   .object({
     orderingCost: z.number().finite().positive().max(1_000_000_000).optional(),
     holdingCost: z.number().finite().positive().max(1_000_000_000).optional(),
     holdingCostUnit: HoldingCostUnit.optional(),
-    shortagePenalty: z.number().finite().positive().max(1_000_000_000).optional(),
+    shortagePenalty: z
+      .number()
+      .finite()
+      .positive()
+      .max(1_000_000_000)
+      .optional(),
     leadTimeDays: z.number().int().min(1).max(28).optional(),
     targetServiceLevel: z.number().finite().gt(0).lt(1).optional(),
   })
@@ -86,7 +95,9 @@ export const AssumptionsView = z
   })
   .strict();
 
-export const RiskFlagView = z.object({ code: z.string(), message: z.string() }).strict();
+export const RiskFlagView = z
+  .object({ code: z.string(), message: z.string() })
+  .strict();
 export const SkuRiskView = z
   .object({
     skuId: SkuId,
@@ -188,10 +199,16 @@ export const RunWhatIfOutput = z
     baselineAssumptions: AssumptionsView.omit({ version: true }),
     scenarioAssumptions: AssumptionsView.omit({ version: true }),
     baseline: z
-      .object({ deterministic: WhatIfPolicyTotals, uncertaintyAware: WhatIfPolicyTotals })
+      .object({
+        deterministic: WhatIfPolicyTotals,
+        uncertaintyAware: WhatIfPolicyTotals,
+      })
       .strict(),
     scenario: z
-      .object({ deterministic: WhatIfPolicyTotals, uncertaintyAware: WhatIfPolicyTotals })
+      .object({
+        deterministic: WhatIfPolicyTotals,
+        uncertaintyAware: WhatIfPolicyTotals,
+      })
       .strict(),
     deltas: z
       .object({
@@ -232,14 +249,20 @@ export const GetRiskSummaryOutput = z
       }),
     ),
     countsByLevel: z
-      .object({ low: z.number().int(), medium: z.number().int(), high: z.number().int() })
+      .object({
+        low: z.number().int(),
+        medium: z.number().int(),
+        high: z.number().int(),
+      })
       .strict(),
     criteria: z.string(),
   })
   .strict();
 
 export const ToolErrorOutput = z
-  .object({ error: z.object({ code: z.string(), message: z.string() }).strict() })
+  .object({
+    error: z.object({ code: z.string(), message: z.string() }).strict(),
+  })
   .strict();
 
 // ---------- assistant response ----------

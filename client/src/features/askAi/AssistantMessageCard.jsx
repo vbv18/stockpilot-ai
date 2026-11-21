@@ -56,7 +56,10 @@ function EvidencePopover({ ev, sessionId, onClose }) {
   const link = getPageLink();
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
       <div
         className="bg-[#13151c] border border-white/[0.12] rounded-2xl p-5 max-w-sm w-full shadow-2xl flex flex-col gap-3"
         onClick={(e) => e.stopPropagation()}
@@ -65,7 +68,10 @@ function EvidencePopover({ ev, sessionId, onClose }) {
           <span className="text-xs font-semibold uppercase tracking-wider text-indigo-400">
             Evidence {ev.evidenceId}
           </span>
-          <button onClick={onClose} className="text-xs text-slate-400 hover:text-white">
+          <button
+            onClick={onClose}
+            className="text-xs text-slate-400 hover:text-white"
+          >
             ✕
           </button>
         </div>
@@ -73,11 +79,15 @@ function EvidencePopover({ ev, sessionId, onClose }) {
         <div className="space-y-1.5 text-xs text-slate-300">
           <div>
             <span className="text-slate-500">Artifact: </span>
-            <span className="capitalize">{ev.artifactType?.replace(/_/g, " ")}</span>
+            <span className="capitalize">
+              {ev.artifactType?.replace(/_/g, " ")}
+            </span>
           </div>
           <div>
             <span className="text-slate-500">ID: </span>
-            <span className="font-mono text-slate-400">{shortId(ev.artifactId)}</span>
+            <span className="font-mono text-slate-400">
+              {shortId(ev.artifactId)}
+            </span>
           </div>
           {ev.skuId && (
             <div>
@@ -90,14 +100,19 @@ function EvidencePopover({ ev, sessionId, onClose }) {
               <span className="text-slate-500">Metrics: </span>
               <div className="flex flex-wrap gap-1 mt-1">
                 {ev.metricKeys.map((k, i) => (
-                  <span key={i} className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-400">
+                  <span
+                    key={i}
+                    className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-mono text-slate-400"
+                  >
                     {k}
                   </span>
                 ))}
               </div>
             </div>
           )}
-          {ev.note && <div className="text-slate-400 italic pt-1">{ev.note}</div>}
+          {ev.note && (
+            <div className="text-slate-400 italic pt-1">{ev.note}</div>
+          )}
         </div>
 
         {link && (
@@ -114,7 +129,11 @@ function EvidencePopover({ ev, sessionId, onClose }) {
   );
 }
 
-export function AssistantMessageCard({ message, sessionId, onSuggestionClick }) {
+export function AssistantMessageCard({
+  message,
+  sessionId,
+  onSuggestionClick,
+}) {
   const [showTools, setShowTools] = useState(false);
   const [activeEvidencePopover, setActiveEvidencePopover] = useState(null);
 
@@ -126,10 +145,13 @@ export function AssistantMessageCard({ message, sessionId, onSuggestionClick }) 
           <span>This answer could not be generated</span>
         </div>
         <p className="text-xs text-slate-400">
-          {message.content || "An error occurred while communicating with the AI assistant."}
+          {message.content ||
+            "An error occurred while communicating with the AI assistant."}
         </p>
         {message.errorCode && (
-          <span className="text-[10px] text-slate-500 font-mono">Code: {message.errorCode}</span>
+          <span className="text-[10px] text-slate-500 font-mono">
+            Code: {message.errorCode}
+          </span>
         )}
       </div>
     );
@@ -179,32 +201,51 @@ export function AssistantMessageCard({ message, sessionId, onSuggestionClick }) 
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-white/[0.06] text-slate-400 bg-white/[0.02]">
-                <th scope="col" className="py-2.5 px-3 font-medium">Label</th>
-                <th scope="col" className="py-2.5 px-3 font-medium">Value</th>
-                <th scope="col" className="py-2.5 px-3 font-medium">SKU</th>
-                <th scope="col" className="py-2.5 px-3 font-medium">Type</th>
-                <th scope="col" className="py-2.5 px-3 font-medium">Evidence</th>
+                <th scope="col" className="py-2.5 px-3 font-medium">
+                  Label
+                </th>
+                <th scope="col" className="py-2.5 px-3 font-medium">
+                  Value
+                </th>
+                <th scope="col" className="py-2.5 px-3 font-medium">
+                  SKU
+                </th>
+                <th scope="col" className="py-2.5 px-3 font-medium">
+                  Type
+                </th>
+                <th scope="col" className="py-2.5 px-3 font-medium">
+                  Evidence
+                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
               {keyFindings.map((f, i) => {
-                const provStyle = PROVENANCE_STYLES[f.provenance] || PROVENANCE_STYLES.observed;
+                const provStyle =
+                  PROVENANCE_STYLES[f.provenance] || PROVENANCE_STYLES.observed;
                 return (
                   <tr key={i} className="hover:bg-white/[0.02]">
-                    <td className="py-2 px-3 text-slate-300 font-medium">{f.label}</td>
+                    <td className="py-2 px-3 text-slate-300 font-medium">
+                      {f.label}
+                    </td>
                     <td className="py-2 px-3 font-semibold text-white">
                       {formatFindingValue(f.value, f.unit)}
                     </td>
-                    <td className="py-2 px-3 font-mono text-slate-400">{f.skuId || "-"}</td>
+                    <td className="py-2 px-3 font-mono text-slate-400">
+                      {f.skuId || "-"}
+                    </td>
                     <td className="py-2 px-3">
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-medium border capitalize ${provStyle}`}>
+                      <span
+                        className={`px-2 py-0.5 rounded text-[10px] font-medium border capitalize ${provStyle}`}
+                      >
                         {f.provenance?.replace(/_/g, " ")}
                       </span>
                     </td>
                     <td className="py-2 px-3">
                       <button
                         onClick={() => {
-                          const evObj = evidence.find((e) => e.evidenceId === f.evidenceId) || {
+                          const evObj = evidence.find(
+                            (e) => e.evidenceId === f.evidenceId,
+                          ) || {
                             evidenceId: f.evidenceId,
                             artifactType: "unknown",
                             artifactId: f.evidenceId,
@@ -228,16 +269,24 @@ export function AssistantMessageCard({ message, sessionId, onSuggestionClick }) 
       {/* 4. Evidence Chips */}
       {evidence.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 pt-1">
-          <span className="text-[11px] text-slate-400 font-medium">Evidence cited:</span>
+          <span className="text-[11px] text-slate-400 font-medium">
+            Evidence cited:
+          </span>
           {evidence.map((ev, i) => (
             <button
               key={i}
               onClick={() => setActiveEvidencePopover(ev)}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-[11px] text-slate-300 border border-white/[0.06] transition-colors"
             >
-              <span className="font-mono text-indigo-400 font-semibold">{ev.evidenceId}</span>
-              <span className="capitalize">{ev.artifactType?.replace(/_/g, " ")}</span>
-              {ev.skuId && <span className="font-mono text-slate-400">({ev.skuId})</span>}
+              <span className="font-mono text-indigo-400 font-semibold">
+                {ev.evidenceId}
+              </span>
+              <span className="capitalize">
+                {ev.artifactType?.replace(/_/g, " ")}
+              </span>
+              {ev.skuId && (
+                <span className="font-mono text-slate-400">({ev.skuId})</span>
+              )}
             </button>
           ))}
         </div>
@@ -261,7 +310,9 @@ export function AssistantMessageCard({ message, sessionId, onSuggestionClick }) 
           >
             <div className="flex items-center gap-2">
               <Brain size={14} className="text-indigo-400" />
-              <span>How this was computed ({toolActions.length} calculation actions)</span>
+              <span>
+                How this was computed ({toolActions.length} calculation actions)
+              </span>
               {hasWhatIf && (
                 <span className="px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 border border-amber-500/20 text-[10px]">
                   What-if scenario (separate from your baseline)
@@ -276,7 +327,10 @@ export function AssistantMessageCard({ message, sessionId, onSuggestionClick }) 
               {toolActions.map((t, idx) => {
                 const label = TOOL_FRIENDLY_NAMES[t.tool] || t.tool;
                 return (
-                  <div key={idx} className="flex items-start justify-between gap-3 p-2 rounded-lg bg-slate-800/40 border border-white/[0.04]">
+                  <div
+                    key={idx}
+                    className="flex items-start justify-between gap-3 p-2 rounded-lg bg-slate-800/40 border border-white/[0.04]"
+                  >
                     <div>
                       <div className="font-medium text-slate-200">{label}</div>
                       <div className="text-[10px] text-slate-400 font-mono mt-0.5 break-all">
@@ -285,7 +339,9 @@ export function AssistantMessageCard({ message, sessionId, onSuggestionClick }) 
                     </div>
                     <span
                       className={`text-[10px] px-1.5 py-0.5 rounded uppercase font-medium ${
-                        t.status === "ok" ? "bg-emerald-500/10 text-emerald-400" : "bg-rose-500/10 text-rose-400"
+                        t.status === "ok"
+                          ? "bg-emerald-500/10 text-emerald-400"
+                          : "bg-rose-500/10 text-rose-400"
                       }`}
                     >
                       {t.status}

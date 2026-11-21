@@ -27,9 +27,14 @@ export function getChatModel() {
   }
 
   if (env.LLM_PROVIDER === "groq" || env.LLM_PROVIDER === "openai") {
-    const configuration = env.LLM_PROVIDER === "groq" ? { baseURL: "https://api.groq.com/openai/v1" } : undefined;
+    const configuration =
+      env.LLM_PROVIDER === "groq"
+        ? { baseURL: "https://api.groq.com/openai/v1" }
+        : undefined;
     return new ChatOpenAI({
-      model: env.LLM_MODEL || (env.LLM_PROVIDER === "groq" ? "llama-3.3-70b-versatile" : "gpt-4o"),
+      model:
+        env.LLM_MODEL ||
+        (env.LLM_PROVIDER === "groq" ? "llama-3.3-70b-versatile" : "gpt-4o"),
       apiKey: env.LLM_API_KEY,
       temperature,
       maxTokens,

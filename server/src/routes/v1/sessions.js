@@ -2,9 +2,12 @@ import { Router } from "express";
 import { z } from "zod";
 import { getUser } from "../../auth/currentUser.js";
 import { PaginationQuery } from "../../contracts/common.js";
-import { IdParam, SessionCreateBody, SessionPatchBody } from "../../contracts/pipeline.js";
+import {
+  IdParam,
+  SessionCreateBody,
+  SessionPatchBody,
+} from "../../contracts/pipeline.js";
 import { AppError } from "../../lib/errors.js";
-import { logger } from "../../lib/logger.js";
 import { getStorage } from "../../lib/storage.js";
 import { validate, getValidated } from "../../middlewares/validate.js";
 import { AiConversationModel } from "../../models/aiConversation.model.js";
@@ -17,7 +20,12 @@ import { JobModel } from "../../models/job.model.js";
 import { OptimizationRunModel } from "../../models/optimizationRun.model.js";
 import { SimulationRunModel } from "../../models/simulationRun.model.js";
 import { WhatIfRunModel } from "../../models/whatIfRun.model.js";
-import { createSession, getSessionOwned, listSessions, toSessionDto } from "../../services/sessionService.js";
+import {
+  createSession,
+  getSessionOwned,
+  listSessions,
+  toSessionDto,
+} from "../../services/sessionService.js";
 import { getEmbedder } from "../../services/vector/embeddings.js";
 import { deleteSession as deleteQdrantSession } from "../../services/vector/qdrantStore.js";
 
@@ -44,28 +52,24 @@ const ListQuery = PaginationQuery.extend({
   archived: z.enum(["true", "false"]).default("false"),
 });
 
-router.get(
-  "/",
-  validate({ query: ListQuery }),
-  async (req, res, next) => {
-    try {
-      const user = getUser(res);
-      const { query } = getValidated(res);
-      const archived = query.archived === "true";
-      const { items, total } = await listSessions(user.userId, {
-        page: query.page,
-        limit: query.limit,
-        archived,
-      });
-      return res.status(200).json({
-        data: items.map(toSessionDto),
-        meta: { page: query.page, limit: query.limit, total },
-      });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+router.get("/", validate({ query: ListQuery }), async (req, res, next) => {
+  try {
+    const user = getUser(res);
+    const { query } = getValidated(res);
+    const archived = query.archived === "true";
+    const { items, total } = await listSessions(user.userId, {
+      page: query.page,
+      limit: query.limit,
+      archived,
+    });
+    return res.status(200).json({
+      data: items.map(toSessionDto),
+      meta: { page: query.page, limit: query.limit, total },
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 // GET /sessions/:sessionId
 router.get(
@@ -116,7 +120,8 @@ router.delete(
     try {
       const user = getUser(res);
       const { params } = getValidated(res);
-      const requestId = res.locals.requestId || req.headers["x-request-id"] || "unknown";
+      const requestId =
+        res.locals.requestId || req.headers["x-request-id"] || "unknown";
       const { userId } = user;
       const { sessionId } = params;
 
@@ -129,7 +134,10 @@ router.delete(
         status: { $in: ["queued", "running"] },
       });
       if (activeJob) {
-        throw new AppError("CONFLICT", "Cancel running jobs before deleting this session.");
+        throw new AppError(
+          "CONFLICT",
+          "Cancel running jobs before deleting this session.",
+        );
       }
 
       // 3. Delete Qdrant points if embedder configured
@@ -137,7 +145,10 @@ router.delete(
         try {
           await deleteQdrantSession(userId, sessionId);
         } catch (qErr) {
-          logger.error({ err: qErr.message, sessionId }, "Failed to delete Qdrant points on session deletion");
+          console.error("Failed to delete Qdrant points on session deletion", {
+            err: qErr.message,
+            sessionId,
+          });
           throw new AppError(
             "UPSTREAM_VECTOR_ERROR",
             "Could not remove AI context; nothing was deleted. Please retry.",
@@ -150,7 +161,10 @@ router.delete(
         const storage = getStorage();
         await storage.deletePrefix(`datasets/${userId}/${sessionId}`);
       } catch (sErr) {
-        logger.warn({ err: sErr.message, sessionId }, "Error deleting storage prefix");
+        console.warn("Error deleting storage prefix", {
+          err: sErr.message,
+          sessionId,
+        });
       }
 
       // 5. Delete Mongo documents filtered by { userId, sessionId }
@@ -167,7 +181,12 @@ router.delete(
       await AnalysisSessionModel.deleteOne({ _id: sessionId, userId });
 
       // 6. Audit log line
-      logger.info({ event: "session_deleted", userId, sessionId, requestId }, "session deleted");
+      console.log("session deleted", {
+        event: "session_deleted",
+        userId,
+        sessionId,
+        requestId,
+      });
 
       return res.status(200).json({ data: { deleted: true } });
     } catch (err) {

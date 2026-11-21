@@ -2,12 +2,22 @@ import { Router } from "express";
 import { z } from "zod";
 import { getUser } from "../../auth/currentUser.js";
 import { DEMO_ASSUMPTION_DEFAULTS } from "../../config/constants.js";
-import { AssumptionsBody, computeProvenance, holdingCostDaily, IdParam } from "../../contracts/pipeline.js";
+import {
+  AssumptionsBody,
+  computeProvenance,
+  holdingCostDaily,
+  IdParam,
+} from "../../contracts/pipeline.js";
 import { AppError } from "../../lib/errors.js";
 import { validate, getValidated } from "../../middlewares/validate.js";
 import { AssumptionSetModel } from "../../models/assumptionSet.model.js";
 import { enqueueJob } from "../../services/jobRunner.js";
-import { getSessionOwned, requireStatus, setStage, transition } from "../../services/sessionService.js";
+import {
+  getSessionOwned,
+  requireStatus,
+  setStage,
+  transition,
+} from "../../services/sessionService.js";
 import { ACTION_ALLOWED_FROM } from "../../services/stateMachine.js";
 
 const router = Router({ mergeParams: true });
@@ -42,7 +52,8 @@ router.get(
       return res.status(200).json({
         data: {
           values: DEMO_ASSUMPTION_DEFAULTS,
-          label: "Illustrative demonstration values. Replace them with your own costs and lead time.",
+          label:
+            "Illustrative demonstration values. Replace them with your own costs and lead time.",
         },
       });
     } catch (err) {
@@ -98,7 +109,10 @@ router.post(
       }
 
       if (!assumptionDoc) {
-        throw new AppError("CONFLICT", "Could not allocate next assumption set version");
+        throw new AppError(
+          "CONFLICT",
+          "Could not allocate next assumption set version",
+        );
       }
 
       session.activeAssumptionSetId = assumptionDoc._id;
@@ -116,28 +130,24 @@ router.post(
 );
 
 // GET /sessions/:sessionId/assumptions
-router.get(
-  "/",
-  validate({ params: IdParam }),
-  async (req, res, next) => {
-    try {
-      const user = getUser(res);
-      const { params } = getValidated(res);
-      await getSessionOwned(user.userId, params.sessionId);
+router.get("/", validate({ params: IdParam }), async (req, res, next) => {
+  try {
+    const user = getUser(res);
+    const { params } = getValidated(res);
+    await getSessionOwned(user.userId, params.sessionId);
 
-      const sets = await AssumptionSetModel.find({
-        sessionId: params.sessionId,
-        userId: user.userId,
-      }).sort({ version: -1 });
+    const sets = await AssumptionSetModel.find({
+      sessionId: params.sessionId,
+      userId: user.userId,
+    }).sort({ version: -1 });
 
-      return res.status(200).json({
-        data: sets.map(toAssumptionSetDto),
-      });
-    } catch (err) {
-      next(err);
-    }
-  },
-);
+    return res.status(200).json({
+      data: sets.map(toAssumptionSetDto),
+    });
+  } catch (err) {
+    next(err);
+  }
+});
 
 export default router;
 export { toAssumptionSetDto };

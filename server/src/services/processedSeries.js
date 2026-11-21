@@ -50,12 +50,19 @@ export async function loadProcessedSeries(userId, datasetId) {
 
     const startDate = rows[0].date;
     const values = [];
-    let expectedDayIndex = Math.floor(Date.parse(`${startDate}T00:00:00Z`) / 86_400_000);
+    let expectedDayIndex = Math.floor(
+      Date.parse(`${startDate}T00:00:00Z`) / 86_400_000,
+    );
 
     for (let i = 0; i < rows.length; i++) {
-      const curDayIndex = Math.floor(Date.parse(`${rows[i].date}T00:00:00Z`) / 86_400_000);
+      const curDayIndex = Math.floor(
+        Date.parse(`${rows[i].date}T00:00:00Z`) / 86_400_000,
+      );
       if (curDayIndex !== expectedDayIndex) {
-        throw new AppError("INTERNAL_ERROR", `Processed dataset series for SKU ${skuId} has non-contiguous dates at index ${i}`);
+        throw new AppError(
+          "INTERNAL_ERROR",
+          `Processed dataset series for SKU ${skuId} has non-contiguous dates at index ${i}`,
+        );
       }
       values.push(rows[i].quantity);
       expectedDayIndex++;
