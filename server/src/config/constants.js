@@ -19,12 +19,13 @@ export const SIMULATION_BOUNDS = {
 };
 
 export const DEMO_ASSUMPTION_DEFAULTS = {
-  orderingCost: 200,
-  holdingCost: 5,
-  holdingCostUnit: "per_unit_per_day",
-  shortagePenalty: 50,
-  leadTimeDays: 7,
-  targetServiceLevel: 0.95,
+  ordering_cost: 200,
+  holding_cost_annual: 1825,
+  shortage_penalty: 50,
+  lead_time_mean: 7,
+  lead_time_std: 0,
+  service_level: 0.95,
+  unit_cost: 100,
 };
 
 export const RISK_THRESHOLDS = {

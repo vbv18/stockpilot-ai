@@ -114,12 +114,47 @@ export function computeSkuRisk(input) {
 
 export function buildSessionRisk(optRun, simRun = null, assumptions = null) {
   if (!optRun || !optRun.result?.skus) return [];
-  const targetServiceLevel = assumptions?.values?.targetServiceLevel ?? 0.95;
-  const simSkus = simRun?.result?.skus || {};
-  const risks = [];
+  const skusMap =
+    assumptions?.skus instanceof Map
+      ? Object.fromEntries(assumptions.skus)
+      : assumptions?.skus ||
+        (assumptions?.toObject
+          ? assumptions.toObject({ flattenMaps: true })?.skus
+          : null) ||
+        {};
 
-  for (const [skuId, skuOpt] of Object.entries(optRun.result.skus)) {
-    const skuSim = simSkus[skuId] || null;
+  const simSkusMap = new Map();
+  if (simRun?.policyResults?.skus) {
+    for (const s of simRun.policyResults.skus) {
+      simSkusMap.set(s.sku_id, s);
+    }
+  } else if (simRun?.result?.skus) {
+    if (Array.isArray(simRun.result.skus)) {
+      for (const s of simRun.result.skus) {
+        simSkusMap.set(s.sku_id, s);
+      }
+    } else {
+      for (const [k, s] of Object.entries(simRun.result.skus)) {
+        simSkusMap.set(s.sku_id || k, s);
+      }
+    }
+  }
+
+  const optSkus = Array.isArray(optRun.result.skus)
+    ? optRun.result.skus
+    : Object.values(optRun.result.skus);
+
+  const risks = [];
+  for (const skuOpt of optSkus) {
+    const skuId = skuOpt.sku_id;
+    const skuSim = simSkusMap.get(skuId) || null;
+    const skuAssump = skusMap[skuId];
+    const targetServiceLevel =
+      skuAssump?.service_level ??
+      skuAssump?.targetServiceLevel ??
+      assumptions?.values?.targetServiceLevel ??
+      0.95;
+
     const r = computeSkuRisk({
       opt: skuOpt,
       evaluation: null,
@@ -130,9 +165,13 @@ export function buildSessionRisk(optRun, simRun = null, assumptions = null) {
       ...r,
       skuId,
       stockoutUnitsDeterministic:
-        skuSim?.deterministic?.mean_stockout_units ?? null,
+        skuSim?.deterministic?.stockout_units_mean ??
+        skuSim?.deterministic?.mean_stockout_units ??
+        null,
       stockoutUnitsUncertaintyAware:
-        skuSim?.uncertainty_aware?.mean_stockout_units ?? null,
+        skuSim?.uncertainty_aware?.stockout_units_mean ??
+        skuSim?.uncertainty_aware?.mean_stockout_units ??
+        null,
     });
   }
   return risks;

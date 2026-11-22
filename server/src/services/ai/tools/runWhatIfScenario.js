@@ -43,76 +43,69 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
   runningWhatIfUsers.add(ctx.userId);
 
   try {
-    const baseVals = assumptions.values;
-    const effective = {
-      orderingCost: baseVals.orderingCost,
-      holdingCost: baseVals.holdingCost,
-      holdingCostUnit: baseVals.holdingCostUnit,
-      shortagePenalty: baseVals.shortagePenalty,
-      leadTimeDays: baseVals.leadTimeDays,
-      targetServiceLevel: baseVals.targetServiceLevel,
-      ...args.overrides,
-    };
+    const baseSkus =
+      assumptions.skus instanceof Map
+        ? Object.fromEntries(assumptions.skus)
+        : assumptions.skus ||
+          (assumptions.toObject
+            ? assumptions.toObject({ flattenMaps: true }).skus
+            : {}) ||
+          {};
 
-    // Validate with AssumptionsBody omitting confirmed
-    const validatedEffective = AssumptionsBody.omit({ confirmed: true }).parse(
-      effective,
-    );
+    const baselineAssumptions = {};
+    const scenarioAssumptions = {};
 
-    // Baseline assumptions view
-    const baseHday =
-      baseVals.holdingCostUnit === "per_unit_per_year"
-        ? baseVals.holdingCost / 365
-        : baseVals.holdingCost;
-    const baselineAssumptions = {
-      orderingCost: baseVals.orderingCost,
-      holdingCost: baseVals.holdingCost,
-      holdingCostUnit: baseVals.holdingCostUnit,
-      holdingCostPerUnitPerDay: baseHday,
-      shortagePenalty: baseVals.shortagePenalty,
-      leadTimeDays: baseVals.leadTimeDays,
-      targetServiceLevel: baseVals.targetServiceLevel,
-    };
+    for (const [skuId, baseVals] of Object.entries(baseSkus)) {
+      const bVals = {
+        ordering_cost: baseVals.ordering_cost,
+        holding_cost_annual: baseVals.holding_cost_annual,
+        shortage_penalty: baseVals.shortage_penalty,
+        lead_time_mean: baseVals.lead_time_mean,
+        lead_time_std: baseVals.lead_time_std ?? 0,
+        service_level: baseVals.service_level,
+        unit_cost: baseVals.unit_cost,
+      };
+      baselineAssumptions[skuId] = bVals;
 
-    // Scenario assumptions view
-    const scenHday =
-      validatedEffective.holdingCostUnit === "per_unit_per_year"
-        ? validatedEffective.holdingCost / 365
-        : validatedEffective.holdingCost;
-    const scenarioAssumptions = {
-      orderingCost: validatedEffective.orderingCost,
-      holdingCost: validatedEffective.holdingCost,
-      holdingCostUnit: validatedEffective.holdingCostUnit,
-      holdingCostPerUnitPerDay: scenHday,
-      shortagePenalty: validatedEffective.shortagePenalty,
-      leadTimeDays: validatedEffective.leadTimeDays,
-      targetServiceLevel: validatedEffective.targetServiceLevel,
-    };
-
-    // Prepare forecast skus for /optimize
-    const forecastSkus = {};
-    for (const [skuId, fData] of Object.entries(forecastRun.result.skus)) {
-      if (fData.status === "ok") {
-        forecastSkus[skuId] = {
-          autoets_mean: fData.autoets_mean,
-          residual_blocks: fData.residual_blocks,
-        };
-      }
+      const ovr = args.overrides[skuId] || {};
+      scenarioAssumptions[skuId] = {
+        ordering_cost: ovr.ordering_cost ?? bVals.ordering_cost,
+        holding_cost_annual:
+          ovr.holding_cost_annual ?? bVals.holding_cost_annual,
+        shortage_penalty: ovr.shortage_penalty ?? bVals.shortage_penalty,
+        lead_time_mean: ovr.lead_time_mean ?? bVals.lead_time_mean,
+        lead_time_std: ovr.lead_time_std ?? bVals.lead_time_std,
+        service_level: ovr.service_level ?? bVals.service_level,
+        unit_cost: ovr.unit_cost ?? bVals.unit_cost,
+      };
     }
 
+    // Prepare forecast skus for /optimize
+    const forecastSkus = forecastRun.result?.forecast?.skus || [];
+    const eligibleSkus = forecastSkus.filter(
+      (s) => s.status === "ok" && s.interval_status === "ok",
+    );
+
+    const modelParams = forecastRun.modelConfig?.params || {};
+    const nBootstrap = modelParams.n_bootstrap ?? 500;
+    const blockSize = modelParams.block_size ?? 7;
+    const bootstrapSeed = forecastRun.seed;
+
+    const optimizeSkus = eligibleSkus.map((s) => ({
+      sku_id: s.sku_id,
+      forecast_mean: s.autoets_mean,
+      residual_blocks: s.residual_blocks,
+      residual_std: s.residual_std,
+    }));
+
     const pyOptimizeReq = {
-      session_id: session._id.toString(),
+      skus: optimizeSkus,
       params: {
-        ordering_cost: validatedEffective.orderingCost,
-        holding_cost: validatedEffective.holdingCost,
-        holding_cost_unit: validatedEffective.holdingCostUnit,
-        lead_time_days: validatedEffective.leadTimeDays,
-        target_service_level: validatedEffective.targetServiceLevel,
-        n_bootstrap: 2000,
-        block_size: 28,
-        bootstrap_seed: 42,
+        n_bootstrap: nBootstrap,
+        block_size: blockSize,
+        bootstrap_seed: bootstrapSeed,
       },
-      skus: forecastSkus,
+      assumptions: scenarioAssumptions,
     };
 
     const optResult = await statsPost(
@@ -132,39 +125,37 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
     const horizonDays = simulationRun.horizonDays ?? 90;
     const seed = simulationRun.seed ?? 42;
 
-    const simSkus = {};
-    for (const [skuId, skuOpt] of Object.entries(optResult.skus)) {
-      if (skuOpt.status === "ok") {
-        const origForecastSku = forecastRun.result.skus[skuId];
-        simSkus[skuId] = {
-          mean_path: origForecastSku.autoets_mean,
-          residual_blocks: origForecastSku.residual_blocks,
-          deterministic: {
-            eoq: skuOpt.eoq,
-            rop: skuOpt.rop_deterministic,
-          },
-          uncertainty_aware: {
-            eoq: skuOpt.eoq,
-            rop: skuOpt.rop_uncertainty_aware,
-          },
-        };
-      }
+    const forecastMap = new Map();
+    for (const s of forecastSkus) {
+      forecastMap.set(s.sku_id, s);
+    }
+
+    const simulateSkus = [];
+    for (const optSku of optResult.skus || []) {
+      if (optSku.status !== "ok") continue;
+      const fcSku = forecastMap.get(optSku.sku_id);
+      if (!fcSku) continue;
+
+      simulateSkus.push({
+        sku_id: optSku.sku_id,
+        forecast_mean: fcSku.autoets_mean,
+        residual_blocks: fcSku.residual_blocks,
+        eoq: optSku.eoq,
+        rop_deterministic: optSku.rop_deterministic,
+        rop_uncertainty_aware: optSku.rop_uncertainty_aware,
+        rop_quantile: optSku.rop_quantile ?? optSku.rop_uncertainty_aware,
+      });
     }
 
     const pySimulateReq = {
-      session_id: session._id.toString(),
+      skus: simulateSkus,
       params: {
-        scenarios: scenarioCount,
+        n_scenarios: scenarioCount,
         horizon_days: horizonDays,
-        lead_time_days: validatedEffective.leadTimeDays,
-        ordering_cost: validatedEffective.orderingCost,
-        holding_cost: validatedEffective.holdingCost,
-        holding_cost_unit: validatedEffective.holdingCostUnit,
-        shortage_penalty: validatedEffective.shortagePenalty,
-        block_size: 28,
+        block_size: blockSize,
         seed,
       },
-      skus: simSkus,
+      assumptions: scenarioAssumptions,
     };
 
     const simResult = await statsPost(
@@ -184,20 +175,18 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
       userId: ctx.userId,
       sessionId: session._id.toString(),
       conversationId: null,
+      baselineOptimizationRunId: optimizationRun._id,
+      baselineSimulationRunId: simulationRun._id,
       overrides: args.overrides,
-      baseline: {
-        assumptions: baselineAssumptions,
-        optimizationRunId: optimizationRun._id.toString(),
-        simulationRunId: simulationRun._id.toString(),
-      },
-      scenario: {
-        assumptions: scenarioAssumptions,
-        optimizationResult: optResult,
-        simulationResult: simResult,
-      },
+      effectiveAssumptions: scenarioAssumptions,
+      optimizationResult: optResult,
+      simulationResult: simResult,
     });
 
-    const baseAgg = simulationRun.result.aggregate || {};
+    const baseAgg =
+      simulationRun.policyResults?.aggregate ||
+      simulationRun.result?.aggregate ||
+      {};
     const scenAgg = simResult.aggregate || {};
 
     const baseDet = baseAgg.deterministic || {};
@@ -206,14 +195,14 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
     const scenUnc = scenAgg.uncertainty_aware || {};
 
     const mapTotals = (t) => ({
-      totalCost: t.mean_total_cost ?? 0,
-      orderingCost: t.mean_ordering_cost ?? 0,
-      holdingCost: t.mean_holding_cost ?? 0,
-      shortageCost: t.mean_shortage_cost ?? 0,
+      totalCost: t.mean_total_cost ?? t.total_cost ?? 0,
+      orderingCost: t.mean_ordering_cost ?? t.ordering_cost ?? 0,
+      holdingCost: t.mean_holding_cost ?? t.holding_cost ?? 0,
+      shortageCost: t.mean_shortage_cost ?? t.shortage_cost ?? 0,
       serviceLevel: t.service_level ?? 0,
-      stockoutUnits: t.mean_stockout_units ?? 0,
-      avgInventory: t.mean_ending_inventory ?? 0,
-      orders: t.mean_orders_placed ?? 0,
+      stockoutUnits: t.mean_stockout_units ?? t.stockout_units ?? 0,
+      avgInventory: t.mean_ending_inventory ?? t.avg_inventory ?? 0,
+      orders: t.mean_orders_placed ?? t.order_count ?? 0,
     });
 
     const baselineTotals = {
@@ -241,13 +230,35 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
     };
 
     const perSku = [];
-    const baseOptSkus = optimizationRun.result.skus || {};
-    const baseSimSkus = simulationRun.result.skus || {};
+    const baseOptSkusMap = new Map();
+    const rawBaseOpt = optimizationRun.result?.skus;
+    if (Array.isArray(rawBaseOpt)) {
+      for (const s of rawBaseOpt) baseOptSkusMap.set(s.sku_id, s);
+    } else if (rawBaseOpt) {
+      for (const [k, s] of Object.entries(rawBaseOpt))
+        baseOptSkusMap.set(s.sku_id || k, s);
+    }
 
-    for (const [skuId, sOpt] of Object.entries(optResult.skus)) {
-      const bOpt = baseOptSkus[skuId];
-      const sSim = simResult.skus?.[skuId];
-      const bSim = baseSimSkus[skuId];
+    const baseSimSkusMap = new Map();
+    const rawBaseSim =
+      simulationRun.policyResults?.skus || simulationRun.result?.skus;
+    if (Array.isArray(rawBaseSim)) {
+      for (const s of rawBaseSim) baseSimSkusMap.set(s.sku_id, s);
+    } else if (rawBaseSim) {
+      for (const [k, s] of Object.entries(rawBaseSim))
+        baseSimSkusMap.set(s.sku_id || k, s);
+    }
+
+    const scenSimSkusMap = new Map();
+    for (const s of simResult.skus || []) {
+      scenSimSkusMap.set(s.sku_id, s);
+    }
+
+    for (const sOpt of optResult.skus || []) {
+      const skuId = sOpt.sku_id;
+      const bOpt = baseOptSkusMap.get(skuId);
+      const sSim = scenSimSkusMap.get(skuId);
+      const bSim = baseSimSkusMap.get(skuId);
 
       if (
         bOpt &&
@@ -256,10 +267,22 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
         sSim &&
         bSim
       ) {
-        const sDetCost = sSim.deterministic?.mean_total_cost ?? 0;
-        const bDetCost = bSim.deterministic?.mean_total_cost ?? 0;
-        const sUncCost = sSim.uncertainty_aware?.mean_total_cost ?? 0;
-        const bUncCost = bSim.uncertainty_aware?.mean_total_cost ?? 0;
+        const sDetCost =
+          sSim.deterministic?.mean_total_cost ??
+          sSim.deterministic?.total_cost_mean ??
+          0;
+        const bDetCost =
+          bSim.deterministic?.mean_total_cost ??
+          bSim.deterministic?.total_cost_mean ??
+          0;
+        const sUncCost =
+          sSim.uncertainty_aware?.mean_total_cost ??
+          sSim.uncertainty_aware?.total_cost_mean ??
+          0;
+        const bUncCost =
+          bSim.uncertainty_aware?.mean_total_cost ??
+          bSim.uncertainty_aware?.total_cost_mean ??
+          0;
 
         perSku.push({
           skuId,

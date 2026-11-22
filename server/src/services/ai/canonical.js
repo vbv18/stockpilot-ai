@@ -11,6 +11,8 @@ export function buildSessionDigest(bundle, risks = null) {
     assumptions,
     optimizationRun,
     simulationRun,
+    portfolioRun,
+    replayRun,
   } = bundle;
 
   let computedRisks = risks;
@@ -29,21 +31,18 @@ export function buildSessionDigest(bundle, risks = null) {
 
   // Assumptions view
   let assumptionsView = null;
-  if (assumptions && assumptions.values) {
-    const a = assumptions.values;
-    const hDay =
-      a.holdingCostUnit === "per_unit_per_year"
-        ? a.holdingCost / 365
-        : a.holdingCost;
+  if (assumptions) {
+    const skusMap =
+      assumptions.skus instanceof Map
+        ? Object.fromEntries(assumptions.skus)
+        : assumptions.skus ||
+          (assumptions.toObject
+            ? assumptions.toObject({ flattenMaps: true }).skus
+            : {}) ||
+          {};
     assumptionsView = {
       version: assumptions.version ?? 1,
-      orderingCost: a.orderingCost,
-      holdingCost: a.holdingCost,
-      holdingCostUnit: a.holdingCostUnit || "per_unit_per_day",
-      holdingCostPerUnitPerDay: hDay,
-      shortagePenalty: a.shortagePenalty,
-      leadTimeDays: a.leadTimeDays,
-      targetServiceLevel: a.targetServiceLevel,
+      skus: skusMap,
     };
   }
 
@@ -82,14 +81,44 @@ export function buildSessionDigest(bundle, risks = null) {
       holdoutCoverage: eData?.interval_metrics?.coverage_p10_p90 ?? null,
       eoq: oData?.eoq ?? null,
       ropDeterministic: oData?.rop_deterministic ?? null,
+      ropQuantile: oData?.rop_quantile ?? null,
       ropUncertaintyAware: oData?.rop_uncertainty_aware ?? null,
       ropGap: oData?.rop_gap ?? null,
       riskLevel: rData?.level || null,
       simDetTotalCost: sData?.deterministic?.mean_total_cost ?? null,
+      simQuaTotalCost: sData?.quantile?.mean_total_cost ?? null,
       simUncTotalCost: sData?.uncertainty_aware?.mean_total_cost ?? null,
       simDetServiceLevel: sData?.deterministic?.service_level ?? null,
+      simQuaServiceLevel: sData?.quantile?.service_level ?? null,
       simUncServiceLevel: sData?.uncertainty_aware?.service_level ?? null,
     });
+  }
+
+  let portfolioSummary = null;
+  if (portfolioRun?.result) {
+    const pr = portfolioRun.result;
+    portfolioSummary = {
+      status: portfolioRun.status,
+      budget: pr.budget ?? null,
+      capacity: pr.capacity ?? null,
+      totalCostDelta: pr.total_cost_delta ?? null,
+      bindingConstraints: pr.binding_constraints || [],
+      budgetShadowPrice: pr.budget_shadow_price ?? null,
+      unconstrainedTotalCost: pr.unconstrained_plan?.total_cost ?? null,
+      constrainedTotalCost: pr.constrained_plan?.total_cost ?? null,
+      budgetUsagePct: pr.budget_usage_pct ?? null,
+      capacityUsagePct: pr.capacity_usage_pct ?? null,
+    };
+  }
+
+  let replaySummary = null;
+  if (replayRun?.results) {
+    const rr = replayRun.results;
+    replaySummary = {
+      status: replayRun.status,
+      holdoutDays: replayRun.holdoutDays ?? 28,
+      aggregate: rr.aggregate || null,
+    };
   }
 
   return {
@@ -111,6 +140,8 @@ export function buildSessionDigest(bundle, risks = null) {
     forecastAggregate: forecastRun?.result?.evaluation?.aggregate || null,
     skus,
     simulationAggregate: simulationRun?.result?.aggregate || null,
+    portfolio: portfolioSummary,
+    replay: replaySummary,
   };
 }
 
@@ -125,6 +156,8 @@ export function loadCanonicalForHit(bundle, hit) {
     assumptions,
     optimizationRun,
     simulationRun,
+    portfolioRun,
+    replayRun,
   } = bundle;
   const { artifactType, artifactId, skuId } = hit;
 
@@ -189,26 +222,23 @@ export function loadCanonicalForHit(bundle, hit) {
     }
 
     case "assumption_set": {
-      if (!assumptions?.values) return null;
-      const a = assumptions.values;
-      const hDay =
-        a.holdingCostUnit === "per_unit_per_year"
-          ? a.holdingCost / 365
-          : a.holdingCost;
+      if (!assumptions) return null;
+      const skusMap =
+        assumptions.skus instanceof Map
+          ? Object.fromEntries(assumptions.skus)
+          : assumptions.skus ||
+            (assumptions.toObject
+              ? assumptions.toObject({ flattenMaps: true }).skus
+              : {}) ||
+            {};
       return {
         artifactType: "assumption_set",
         artifactId: assumptions._id.toString(),
         skuId: null,
-        label: `Assumptions version ${assumptions.version}`,
+        label: `Assumptions version ${assumptions.version ?? 1}`,
         payload: {
           version: assumptions.version ?? 1,
-          orderingCost: a.orderingCost,
-          holdingCost: a.holdingCost,
-          holdingCostUnit: a.holdingCostUnit || "per_unit_per_day",
-          holdingCostPerUnitPerDay: hDay,
-          shortagePenalty: a.shortagePenalty,
-          leadTimeDays: a.leadTimeDays,
-          targetServiceLevel: a.targetServiceLevel,
+          skus: skusMap,
         },
       };
     }
@@ -259,6 +289,103 @@ export function loadCanonicalForHit(bundle, hit) {
         skuId: null,
         label: "Simulation aggregate",
         payload: simAgg,
+      };
+    }
+
+    case "portfolio_aggregate": {
+      if (!portfolioRun?.result) return null;
+      return {
+        artifactType: "portfolio_run",
+        artifactId: portfolioRun._id.toString(),
+        skuId: null,
+        label: "Portfolio optimization aggregate",
+        payload: {
+          budget: portfolioRun.result.budget ?? null,
+          capacity: portfolioRun.result.capacity ?? null,
+          bindingConstraints: portfolioRun.result.binding_constraints || [],
+          budgetShadowPrice: portfolioRun.result.budget_shadow_price ?? null,
+          totalCostDelta: portfolioRun.result.total_cost_delta ?? null,
+          budgetUsagePct: portfolioRun.result.budget_usage_pct ?? null,
+          capacityUsagePct: portfolioRun.result.capacity_usage_pct ?? null,
+          unconstrained: portfolioRun.result.unconstrained_plan,
+          constrained: portfolioRun.result.constrained_plan,
+        },
+      };
+    }
+
+    case "portfolio_sku": {
+      if (!portfolioRun?.result || !skuId) return null;
+      const uMap = new Map(
+        (portfolioRun.result.unconstrained_plan?.skus || []).map((s) => [
+          s.sku_id,
+          s,
+        ]),
+      );
+      const cMap = new Map(
+        (portfolioRun.result.constrained_plan?.skus || []).map((s) => [
+          s.sku_id,
+          s,
+        ]),
+      );
+      const u = uMap.get(skuId);
+      const c = cMap.get(skuId);
+      if (!u && !c) return null;
+      return {
+        artifactType: "portfolio_run",
+        artifactId: portfolioRun._id.toString(),
+        skuId,
+        label: `Portfolio plan for SKU ${skuId}`,
+        payload: {
+          skuId,
+          unconstrained: u || null,
+          constrained: c || null,
+          costDelta:
+            c?.total_cost != null && u?.total_cost != null
+              ? c.total_cost - u.total_cost
+              : null,
+          serviceLevelDelta:
+            c?.service_level != null && u?.service_level != null
+              ? c.service_level - u.service_level
+              : null,
+        },
+      };
+    }
+
+    case "replay_aggregate": {
+      if (!replayRun?.results) return null;
+      return {
+        artifactType: "replay_run",
+        artifactId: replayRun._id.toString(),
+        skuId: null,
+        label: "Actual demand replay aggregate",
+        payload: replayRun.results.aggregate || null,
+      };
+    }
+
+    case "replay_sku": {
+      if (!replayRun?.results || !skuId) return null;
+      const skus = Array.isArray(replayRun.results.skus)
+        ? replayRun.results.skus
+        : Object.values(replayRun.results.skus || {});
+      const skuReplay = skus.find((s) => s.sku_id === skuId);
+      if (!skuReplay) return null;
+      return {
+        artifactType: "replay_run",
+        artifactId: replayRun._id.toString(),
+        skuId,
+        label: `Actual demand replay for SKU ${skuId}`,
+        payload: skuReplay,
+      };
+    }
+
+    case "backtest_aggregate": {
+      if (!forecastRun?.result?.evaluation) return null;
+      return {
+        artifactType: "evaluation",
+        artifactId: forecastRun._id.toString(),
+        skuId: null,
+        label: "Rolling backtest model comparison aggregate",
+        payload: forecastRun.result.evaluation.aggregate || null,
       };
     }
 

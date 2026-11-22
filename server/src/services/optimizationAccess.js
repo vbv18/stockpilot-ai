@@ -43,9 +43,10 @@ export async function buildSessionRisk(userId, sessionId) {
   const assumptionSet = await AssumptionSetModel.findById(
     optRun.assumptionSetId,
   );
-  const targetServiceLevel = assumptionSet
-    ? assumptionSet.targetServiceLevel
-    : 0.95;
+  const skusMap =
+    assumptionSet?.skus instanceof Map
+      ? Object.fromEntries(assumptionSet.skus)
+      : assumptionSet?.skus || {};
 
   const forecastRun = await ForecastRunModel.findById(optRun.forecastRunId);
   const evaluationsBySku = new Map();
@@ -71,11 +72,12 @@ export async function buildSessionRisk(userId, sessionId) {
   }
 
   const risks = optRun.result.skus.map((optSku) => {
+    const skuAssump = skusMap[optSku.sku_id];
     return computeSkuRisk({
       opt: optSku,
       evaluation: evaluationsBySku.get(optSku.sku_id) || null,
       simulation: simulationsBySku.get(optSku.sku_id) || null,
-      targetServiceLevel,
+      targetServiceLevel: skuAssump?.service_level ?? 0.95,
     });
   });
 

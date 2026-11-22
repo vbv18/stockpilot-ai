@@ -27,28 +27,33 @@ export async function getInventoryRecommendation(rawArgs, bundle) {
     );
   }
 
-  if (!assumptions || !assumptions.values) {
+  const skusMap =
+    assumptions?.skus instanceof Map
+      ? Object.fromEntries(assumptions.skus)
+      : assumptions?.skus ||
+        (assumptions?.toObject
+          ? assumptions.toObject({ flattenMaps: true }).skus
+          : null) ||
+        {};
+
+  const skuAssump = skusMap[args.skuId];
+  if (!skuAssump) {
     throw new AppError(
       "NOT_FOUND",
-      "Assumption set not found for this session",
+      `Assumptions for SKU ${args.skuId} not found`,
     );
   }
 
-  const aVals = assumptions.values;
-  const holdingCostPerUnitPerDay =
-    aVals.holdingCostUnit === "per_unit_per_year"
-      ? aVals.holdingCost / 365
-      : aVals.holdingCost;
-
   const assumptionsView = {
     version: assumptions.version ?? 1,
-    orderingCost: aVals.orderingCost,
-    holdingCost: aVals.holdingCost,
-    holdingCostUnit: aVals.holdingCostUnit || "per_unit_per_day",
-    holdingCostPerUnitPerDay,
-    shortagePenalty: aVals.shortagePenalty,
-    leadTimeDays: aVals.leadTimeDays,
-    targetServiceLevel: aVals.targetServiceLevel,
+    skuId: args.skuId,
+    ordering_cost: skuAssump.ordering_cost,
+    holding_cost_annual: skuAssump.holding_cost_annual,
+    shortage_penalty: skuAssump.shortage_penalty,
+    lead_time_mean: skuAssump.lead_time_mean,
+    lead_time_std: skuAssump.lead_time_std ?? 0,
+    service_level: skuAssump.service_level,
+    unit_cost: skuAssump.unit_cost,
   };
 
   // Only include simulation if active simulation belongs to this optimization run
@@ -62,7 +67,7 @@ export async function getInventoryRecommendation(rawArgs, bundle) {
     opt: skuOpt,
     evaluation: null,
     simulation: activeSim?.result?.skus?.[args.skuId] || null,
-    targetServiceLevel: aVals.targetServiceLevel,
+    targetServiceLevel: skuAssump.service_level,
   });
   const riskView = {
     skuId: args.skuId,

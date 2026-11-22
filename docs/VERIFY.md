@@ -41,7 +41,7 @@ This checklist defines the manual acceptance and operational verification proced
 ## 4. Multi-Model Statistical Forecasting
 
 - [ ] **Model Generation**: Trigger forecast job with 30-day horizon.
-- [ ] **Evaluation & Selection**: Confirm Python stats service runs backtesting across candidate models (AutoARIMA, ETS, Croston/SBA, Seasonal Naive, Linear Regression).
+- [ ] **Evaluation & Selection**: Confirm Python stats service runs backtesting across candidate models (ETS, Croston/SBA, Seasonal Naive).
 - [ ] **Metrics Inspection**: Verify WAPE, RMSE, and MAE are computed per model, and the winning model is selected per SKU.
 - [ ] **Confidence Intervals & Residuals**: Confirm 80% and 95% prediction intervals and residual blocks are returned and visualized.
 

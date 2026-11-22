@@ -39,10 +39,11 @@ export default function OptimizationPage() {
   const [selectedSkuForDrawer, setSelectedSkuForDrawer] = useState(null);
 
   const canRun =
-    session.status === "assumptions_pending" ||
-    session.status === "optimization_failed" ||
-    session.status === "optimization_ready" ||
-    optData?.stale;
+    (session.status === "assumptions_pending" ||
+      session.status === "optimization_failed" ||
+      session.status === "optimization_ready" ||
+      optData?.stale) &&
+    Boolean(session.activeAssumptionSetId);
 
   const handleRunOptimization = async () => {
     try {
@@ -143,6 +144,10 @@ export default function OptimizationPage() {
               {COPY.deterministicDef}
             </p>
             <p>
+              <strong className="text-slate-200">Quantile ROP:</strong>{" "}
+              {COPY.quantileDef}
+            </p>
+            <p>
               <strong className="text-slate-200">Normal Approx:</strong>{" "}
               {COPY.normalApprox}
             </p>
@@ -174,32 +179,18 @@ export default function OptimizationPage() {
             </div>
             <div>
               <span className="text-slate-500 text-[11px]">
-                Ordering Cost (S):
+                Configured SKUs:
               </span>
               <span className="font-mono text-slate-200 ml-1.5">
-                {fmtInr(assumptions.orderingCost)}
+                {Object.keys(assumptions.skus || {}).length} SKUs
               </span>
             </div>
             <div>
               <span className="text-slate-500 text-[11px]">
-                Daily Holding (H):
+                Policy Mode:
               </span>
-              <span className="font-mono text-slate-200 ml-1.5">
-                {fmtInr(assumptions.holdingCostPerUnitPerDay, true)}
-              </span>
-            </div>
-            <div>
-              <span className="text-slate-500 text-[11px]">Lead Time:</span>
-              <span className="font-mono text-slate-200 ml-1.5">
-                {assumptions.leadTimeDays} days
-              </span>
-            </div>
-            <div>
-              <span className="text-slate-500 text-[11px]">
-                Service Target:
-              </span>
-              <span className="font-mono text-slate-200 ml-1.5">
-                {fmtPct(assumptions.targetServiceLevel, 0)}
+              <span className="font-mono text-indigo-300 ml-1.5 font-medium">
+                Per-SKU Parameters
               </span>
             </div>
           </div>
@@ -248,6 +239,12 @@ export default function OptimizationPage() {
                   </th>
                   <th
                     scope="col"
+                    className="px-3 py-2.5 text-right font-sans text-sky-400"
+                  >
+                    ROP Quantile
+                  </th>
+                  <th
+                    scope="col"
                     className="px-3 py-2.5 text-right font-sans text-emerald-400"
                   >
                     ROP Uncertainty-Aware
@@ -288,6 +285,9 @@ export default function OptimizationPage() {
                       </td>
                       <td className="px-3 py-3 text-right font-semibold text-slate-200">
                         {sku.rop_deterministic}
+                      </td>
+                      <td className="px-3 py-3 text-right font-semibold text-sky-300">
+                        {sku.rop_quantile ?? "—"}
                       </td>
                       <td className="px-3 py-3 text-right font-bold text-emerald-300">
                         {sku.rop_uncertainty_aware}
@@ -370,7 +370,7 @@ export default function OptimizationPage() {
         <SkuDrawer
           sku={selectedSkuForDrawer}
           risk={riskBySku.get(selectedSkuForDrawer.sku_id)}
-          assumptions={assumptions}
+          skuAssumptions={assumptions?.skus?.[selectedSkuForDrawer.sku_id]}
           onClose={() => setSelectedSkuForDrawer(null)}
         />
       )}

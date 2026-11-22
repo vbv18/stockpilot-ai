@@ -7,9 +7,14 @@ skus = [
     for s in fc["skus"] if s["status"] == "ok" and s["interval_status"] == "ok"
 ]
 params = {
-    "ordering_cost": 200, "holding_cost_daily": 5, "shortage_penalty": 50,
-    "lead_time_days": 7, "target_service_level": 0.95,
     "n_bootstrap": fc["params"]["n_bootstrap"], "block_size": fc["params"]["block_size"],
     "bootstrap_seed": fc["params"]["seed"],
 }
-print(json.dumps({"skus": skus, "params": params}))
+assumptions = {
+    s["sku_id"]: {
+        "ordering_cost": 200, "holding_cost_annual": 1825, "shortage_penalty": 50,
+        "lead_time_mean": 7, "lead_time_std": 0, "service_level": 0.95, "unit_cost": 100,
+    }
+    for s in skus
+}
+print(json.dumps({"skus": skus, "params": params, "assumptions": assumptions}))

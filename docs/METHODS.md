@@ -30,12 +30,10 @@ Demand series are classified using Syntetos-Boylan criteria based on Average Dem
 
 StockPilot AI evaluates candidate models per SKU using rolling-origin backtesting:
 
-1. **AutoARIMA**: Optimal order $(p, d, q) \times (P, D, Q)_s$ via AIC minimization.
-2. **Exponential Smoothing (ETS)**: State-space formulation (additive or multiplicative trend and seasonality).
-3. **Croston Method / Syntetos-Boylan Approximation (SBA)**: Decoupled demand size and inter-arrival forecasting for intermittent demand:
+1. **Exponential Smoothing (ETS)**: State-space formulation (additive or multiplicative trend and seasonality).
+2. **Croston Method / Syntetos-Boylan Approximation (SBA)**: Decoupled demand size and inter-arrival forecasting for intermittent demand:
    $$\hat{y}_{\text{SBA}} = \left(1 - \frac{\alpha}{2}\right) \frac{\hat{z}_t}{\hat{p}_t}$$
-4. **Seasonal Naive**: $D_{t+h} = D_{t+h-m}$ where $m$ is the seasonal period (e.g., 7 days).
-5. **Linear Regression with Calendar Features**: Day of week, month, and trend indicators.
+3. **Seasonal Naive**: $D_{t+h} = D_{t+h-m}$ where $m$ is the seasonal period (e.g., 7 days).
 
 ### Forecast Evaluation Metrics
 

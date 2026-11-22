@@ -11,6 +11,8 @@ import {
 import { AppError } from "../../lib/errors.js";
 import { validate, getValidated } from "../../middlewares/validate.js";
 import { AssumptionSetModel } from "../../models/assumptionSet.model.js";
+import { DatasetModel } from "../../models/dataset.model.js";
+import { ForecastRunModel } from "../../models/forecastRun.model.js";
 import { enqueueJob } from "../../services/jobRunner.js";
 import {
   getSessionOwned,
@@ -23,19 +25,21 @@ import { ACTION_ALLOWED_FROM } from "../../services/stateMachine.js";
 const router = Router({ mergeParams: true });
 
 function toAssumptionSetDto(doc) {
-  const d = doc.toObject ? doc.toObject() : doc;
+  const d = doc.toObject ? doc.toObject({ flattenMaps: true }) : doc;
+  const skusObj =
+    d.skus instanceof Map ? Object.fromEntries(d.skus) : d.skus || {};
   return {
-    id: d._id.toString(),
+    id: d._id ? d._id.toString() : d.id,
     version: d.version,
-    orderingCost: d.orderingCost,
-    holdingCost: d.holdingCost,
-    holdingCostUnit: d.holdingCostUnit,
-    shortagePenalty: d.shortagePenalty,
-    leadTimeDays: d.leadTimeDays,
-    targetServiceLevel: d.targetServiceLevel,
-    holdingCostPerUnitPerDay: holdingCostDaily(d),
-    provenance: d.provenance,
-    confirmedAt: d.confirmedAt ? d.confirmedAt.toISOString() : null,
+    skus: skusObj,
+    provenance: d.provenance || {},
+    budget: d.budget ?? null,
+    capacity: d.capacity ?? null,
+    confirmedAt: d.confirmedAt
+      ? d.confirmedAt.toISOString
+        ? d.confirmedAt.toISOString()
+        : d.confirmedAt
+      : null,
   };
 }
 
@@ -47,11 +51,46 @@ router.get(
     try {
       const user = getUser(res);
       const { params } = getValidated(res);
-      await getSessionOwned(user.userId, params.sessionId);
+      const session = await getSessionOwned(user.userId, params.sessionId);
+
+      let skuIds = [];
+      if (session.activeDatasetId) {
+        const dataset = await DatasetModel.findOne({
+          _id: session.activeDatasetId,
+          userId: user.userId,
+        });
+        skuIds = dataset?.validationSummary?.skuIds || [];
+      }
+      if (skuIds.length === 0 && session.activeForecastRunId) {
+        const forecastRun = await ForecastRunModel.findOne({
+          _id: session.activeForecastRunId,
+          userId: user.userId,
+        });
+        skuIds = (forecastRun?.result?.forecast?.skus || []).map(
+          (s) => s.sku_id,
+        );
+      }
+
+      const defaultSkuValues = {
+        ordering_cost: DEMO_ASSUMPTION_DEFAULTS.ordering_cost,
+        holding_cost_annual: DEMO_ASSUMPTION_DEFAULTS.holding_cost_annual,
+        shortage_penalty: DEMO_ASSUMPTION_DEFAULTS.shortage_penalty,
+        lead_time_mean: DEMO_ASSUMPTION_DEFAULTS.lead_time_mean,
+        lead_time_std: DEMO_ASSUMPTION_DEFAULTS.lead_time_std ?? 0,
+        service_level: DEMO_ASSUMPTION_DEFAULTS.service_level,
+        unit_cost: DEMO_ASSUMPTION_DEFAULTS.unit_cost,
+      };
+
+      const skus = {};
+      for (const skuId of skuIds) {
+        skus[skuId] = { ...defaultSkuValues };
+      }
 
       return res.status(200).json({
         data: {
-          values: DEMO_ASSUMPTION_DEFAULTS,
+          skuIds,
+          skus,
+          values: defaultSkuValues,
           label:
             "Illustrative demonstration values. Replace them with your own costs and lead time.",
         },
@@ -74,7 +113,34 @@ router.post(
 
       requireStatus(session, ACTION_ALLOWED_FROM.assumptions);
 
-      const provenance = computeProvenance(body);
+      let expectedSkuIds = [];
+      if (session.activeDatasetId) {
+        const dataset = await DatasetModel.findOne({
+          _id: session.activeDatasetId,
+          userId: user.userId,
+        });
+        expectedSkuIds = dataset?.validationSummary?.skuIds || [];
+      }
+      if (expectedSkuIds.length === 0 && session.activeForecastRunId) {
+        const forecastRun = await ForecastRunModel.findOne({
+          _id: session.activeForecastRunId,
+          userId: user.userId,
+        });
+        expectedSkuIds = (forecastRun?.result?.forecast?.skus || []).map(
+          (s) => s.sku_id,
+        );
+      }
+
+      for (const skuId of expectedSkuIds) {
+        if (!body.skus[skuId]) {
+          throw new AppError(
+            "UNPROCESSABLE_ENTITY",
+            `Missing assumptions for SKU ${skuId}. Every SKU in the session requires all fields.`,
+          );
+        }
+      }
+
+      const provenance = computeProvenance(body.skus);
 
       // Retry loop on version duplicate key
       let assumptionDoc = null;
@@ -90,13 +156,10 @@ router.post(
             userId: user.userId,
             sessionId: params.sessionId,
             version: nextVersion,
-            orderingCost: body.orderingCost,
-            holdingCost: body.holdingCost,
-            holdingCostUnit: body.holdingCostUnit,
-            shortagePenalty: body.shortagePenalty,
-            leadTimeDays: body.leadTimeDays,
-            targetServiceLevel: body.targetServiceLevel,
+            skus: body.skus,
             provenance,
+            budget: body.budget ?? null,
+            capacity: body.capacity ?? null,
             confirmedAt: new Date(),
           });
           break;
@@ -116,6 +179,12 @@ router.post(
       }
 
       session.activeAssumptionSetId = assumptionDoc._id;
+      if (body.budget !== undefined) {
+        session.budget = body.budget;
+      }
+      if (body.capacity !== undefined) {
+        session.capacity = body.capacity;
+      }
       await session.save();
 
       await transition(user.userId, params.sessionId, "assumptions_pending");

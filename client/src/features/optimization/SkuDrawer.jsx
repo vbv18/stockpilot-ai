@@ -10,9 +10,9 @@ import {
 } from "recharts";
 import { AlertTriangle, CheckCircle, ShieldAlert, X } from "lucide-react";
 import { COPY } from "../../lib/copy.js";
-import { fmtNum } from "../../lib/format.js";
+import { fmtInr, fmtNum, fmtPct } from "../../lib/format.js";
 
-export function SkuDrawer({ sku, risk, onClose }) {
+export function SkuDrawer({ sku, risk, skuAssumptions, onClose }) {
   if (!sku) return null;
 
   const ltd = sku.ltd || {};
@@ -53,11 +53,70 @@ export function SkuDrawer({ sku, risk, onClose }) {
           <span className="font-bold underline text-white">{sku.eoq}</span>{" "}
           units when inventory position reaches{" "}
           <span className="font-bold underline text-white">
-            {sku.rop_uncertainty_aware ?? sku.rop_deterministic}
+            {sku.rop_uncertainty_aware ?? sku.rop_quantile ?? sku.rop_deterministic}
           </span>{" "}
           units.
         </p>
       </div>
+
+      {/* SKU Assumptions Panel */}
+      {skuAssumptions && (
+        <div className="flex flex-col gap-2">
+          <span className="text-xs font-semibold text-slate-300">
+            Assumptions for this SKU
+          </span>
+          <div className="grid grid-cols-2 gap-2 text-xs font-mono bg-slate-900/60 border border-white/[0.04] p-3.5 rounded-xl">
+            <div>
+              <span className="text-slate-500 block text-[10px]">
+                Ordering Cost (S)
+              </span>
+              <span className="text-slate-200 font-medium">
+                {fmtInr(skuAssumptions.ordering_cost)}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px]">
+                Annual Holding Cost (H)
+              </span>
+              <span className="text-slate-200 font-medium">
+                {fmtInr(skuAssumptions.holding_cost_annual)}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px]">
+                Shortage Penalty
+              </span>
+              <span className="text-slate-200 font-medium">
+                {fmtInr(skuAssumptions.shortage_penalty)}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px]">
+                Lead Time Mean
+              </span>
+              <span className="text-slate-200 font-medium">
+                {skuAssumptions.lead_time_mean} days
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px]">
+                Target Service Level
+              </span>
+              <span className="text-slate-200 font-medium">
+                {fmtPct(skuAssumptions.service_level, 0)}
+              </span>
+            </div>
+            <div>
+              <span className="text-slate-500 block text-[10px]">
+                Unit Cost
+              </span>
+              <span className="text-slate-200 font-medium">
+                {fmtInr(skuAssumptions.unit_cost)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Model Intermediates Grid */}
       <div className="flex flex-col gap-2">
@@ -123,6 +182,14 @@ export function SkuDrawer({ sku, risk, onClose }) {
           </div>
           <div>
             <span className="text-slate-500 block text-[10px]">
+              Quantile ROP Raw
+            </span>
+            <span className="text-slate-200 font-medium">
+              {fmtNum(sku.rop_quantile_raw, 2)} → {sku.rop_quantile ?? "—"}
+            </span>
+          </div>
+          <div>
+            <span className="text-slate-500 block text-[10px]">
               Uncertainty ROP Raw
             </span>
             <span className="text-slate-200 font-medium">
@@ -168,6 +235,18 @@ export function SkuDrawer({ sku, risk, onClose }) {
                   label={{
                     value: `ROP_d: ${sku.rop_deterministic}`,
                     fill: "#f59e0b",
+                    fontSize: 9,
+                  }}
+                />
+              )}
+              {sku.rop_quantile && (
+                <ReferenceLine
+                  y={sku.rop_quantile}
+                  stroke="#38bdf8"
+                  strokeDasharray="3 3"
+                  label={{
+                    value: `ROP_q: ${sku.rop_quantile}`,
+                    fill: "#38bdf8",
                     fontSize: 9,
                   }}
                 />

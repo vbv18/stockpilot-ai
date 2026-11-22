@@ -40,6 +40,15 @@ const analysisSessionSchema = new mongoose.Schema(
       forecast: { type: stageSchema, default: () => ({}) },
       optimization: { type: stageSchema, default: () => ({}) },
       simulation: { type: stageSchema, default: () => ({}) },
+      portfolio: { type: stageSchema, default: () => ({}) },
+    },
+    budget: {
+      type: Number,
+      default: null,
+    },
+    capacity: {
+      type: Number,
+      default: null,
     },
     activeDatasetId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -65,6 +74,16 @@ const analysisSessionSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       default: null,
       ref: "simulation_runs",
+    },
+    activeReplayRunId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+      ref: "replay_runs",
+    },
+    activePortfolioRunId: {
+      type: mongoose.Schema.Types.ObjectId,
+      default: null,
+      ref: "portfolio_runs",
     },
     aiIndex: {
       status: {

@@ -5,6 +5,7 @@ export const STEPS = [
   "assumptions",
   "optimization",
   "simulation",
+  "portfolio",
 ];
 
 export function currentStep(s) {
@@ -57,8 +58,9 @@ export function maxReachableIndex(s) {
       return 5;
     case "simulating":
     case "simulation_failed":
-    case "completed":
       return 5;
+    case "completed":
+      return 6;
     default:
       return 0;
   }

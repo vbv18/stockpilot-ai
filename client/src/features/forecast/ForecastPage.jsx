@@ -23,6 +23,41 @@ import { JobProgress } from "../jobs/JobProgress.jsx";
 import { useJobTracker } from "../jobs/useJobTracker.js";
 import { ForecastChart } from "./ForecastChart.jsx";
 
+export function getDemandClassBadge(demandClass) {
+  switch (demandClass) {
+    case "smooth":
+      return {
+        label: "Smooth",
+        className:
+          "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20",
+      };
+    case "erratic":
+      return {
+        label: "Erratic",
+        className:
+          "bg-amber-500/10 text-amber-400 border border-amber-500/20",
+      };
+    case "intermittent":
+      return {
+        label: "Intermittent",
+        className:
+          "bg-blue-500/10 text-blue-400 border border-blue-500/20",
+      };
+    case "lumpy":
+      return {
+        label: "Lumpy",
+        className:
+          "bg-purple-500/10 text-purple-400 border border-purple-500/20",
+      };
+    default:
+      return {
+        label: demandClass || "Unknown",
+        className:
+          "bg-slate-500/10 text-slate-400 border border-slate-500/20",
+      };
+  }
+}
+
 export default function ForecastPage() {
   const { session } = useOutletContext();
   const navigate = useNavigate();
@@ -210,7 +245,7 @@ export default function ForecastPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-4 flex flex-col gap-2">
                 <span className="text-[11px] text-slate-400 font-medium">
-                  AutoETS Accuracy (Holdout)
+                  AutoETS Accuracy (Rolling)
                 </span>
                 <div className="flex items-baseline gap-2">
                   <span className="text-lg font-bold text-indigo-400">
@@ -220,7 +255,7 @@ export default function ForecastPage() {
                 </div>
                 <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-white/[0.04]">
                   <span>MAE: {fmtNum(aggregate.autoets?.mae_mean, 2)}</span>
-                  <span>RMSE: {fmtNum(aggregate.autoets?.rmse_mean, 2)}</span>
+                  <span>MASE: {fmtNum(aggregate.autoets?.mase_mean, 2)}</span>
                 </div>
               </div>
 
@@ -239,7 +274,7 @@ export default function ForecastPage() {
                     MAE: {fmtNum(aggregate.seasonal_naive?.mae_mean, 2)}
                   </span>
                   <span>
-                    RMSE: {fmtNum(aggregate.seasonal_naive?.rmse_mean, 2)}
+                    MASE: {fmtNum(aggregate.seasonal_naive?.mase_mean, 2)}
                   </span>
                 </div>
               </div>
@@ -291,6 +326,7 @@ export default function ForecastPage() {
                 const isEligible =
                   sku.status === "ok" && sku.interval_status === "ok";
                 const isSelected = activeSelectedSkus.includes(sku.sku_id);
+                const badge = getDemandClassBadge(sku.demand_class);
 
                 return (
                   <button
@@ -302,9 +338,9 @@ export default function ForecastPage() {
                       !isEligible
                         ? sku.message ||
                           "Insufficient history for prediction intervals"
-                        : ""
+                        : `${sku.sku_id} - ${badge.label} (ADI: ${sku.adi ?? "-"}, CV²: ${sku.cv2 ?? "-"})`
                     }
-                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-medium transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-mono font-medium transition-all cursor-pointer flex items-center gap-1.5 ${
                       isSelected
                         ? "bg-indigo-600 text-white shadow-md shadow-indigo-700/30"
                         : isEligible
@@ -312,7 +348,18 @@ export default function ForecastPage() {
                           : "bg-slate-900/40 border border-white/[0.04] text-slate-600 cursor-not-allowed opacity-60"
                     }`}
                   >
-                    {sku.sku_id}
+                    <span>{sku.sku_id}</span>
+                    {sku.demand_class && (
+                      <span
+                        className={`text-[9px] px-1.5 py-0.2 rounded font-sans uppercase font-medium ${
+                          isSelected
+                            ? "bg-white/20 text-white"
+                            : badge.className
+                        }`}
+                      >
+                        {badge.label}
+                      </span>
+                    )}
                   </button>
                 );
               })}
@@ -353,6 +400,15 @@ export default function ForecastPage() {
                       SKU
                     </th>
                     <th scope="col" className="px-3 py-2">
+                      Demand Class
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-right">
+                      ADI
+                    </th>
+                    <th scope="col" className="px-3 py-2 text-right">
+                      CV²
+                    </th>
+                    <th scope="col" className="px-3 py-2">
                       Status
                     </th>
                     <th scope="col" className="px-3 py-2">
@@ -379,11 +435,29 @@ export default function ForecastPage() {
                   {skusList.map((sku) => {
                     const hasWarnings = sku.warnings && sku.warnings.length > 0;
                     const isExpanded = expandedWarningSku === sku.sku_id;
+                    const badge = getDemandClassBadge(sku.demand_class);
 
                     return (
                       <tr key={sku.sku_id} className="hover:bg-white/[0.01]">
                         <td className="px-3 py-2 font-medium text-slate-100">
                           {sku.sku_id}
+                        </td>
+                        <td className="px-3 py-2 font-sans">
+                          {sku.demand_class ? (
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-medium uppercase ${badge.className}`}
+                            >
+                              {badge.label}
+                            </span>
+                          ) : (
+                            <span className="text-slate-600">-</span>
+                          )}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {fmtNum(sku.adi, 2)}
+                        </td>
+                        <td className="px-3 py-2 text-right">
+                          {fmtNum(sku.cv2, 2)}
                         </td>
                         <td className="px-3 py-2 font-sans">
                           <span
@@ -455,6 +529,165 @@ export default function ForecastPage() {
                 </ul>
               </div>
             )}
+          </div>
+
+          {/* Per-SKU Model Evaluation & Selection Table (8-Origin Backtest) */}
+          <div className="flex flex-col gap-4">
+            <div>
+              <h3 className="text-xs font-semibold text-slate-300">
+                Model Evaluation & Selection (8-Origin Rolling Backtest)
+              </h3>
+              <p className="text-xs text-slate-400 mt-0.5">
+                Evaluated with Seasonal Naive (m=7), AutoETS, and Croston SBA (for intermittent/lumpy patterns). The model with the lowest rolling MASE is chosen per SKU to feed the interval bootstrap.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              {skusList.map((sku) => {
+                const skuEv = evalMap.get(sku.sku_id);
+                const modelsMap = skuEv?.models || {};
+                const chosenModel = skuEv?.chosen_model || sku.chosen_model || "AutoETS";
+                const maseImprovement = skuEv?.mase_improvement ?? sku.mase_improvement ?? 0;
+
+                const candidateKeys = Object.keys(modelsMap).length > 0
+                  ? Object.keys(modelsMap)
+                  : ["AutoETS", "SeasonalNaive"];
+
+                const displayModels = candidateKeys.map((key) => {
+                  const metrics = modelsMap[key] || (key === "AutoETS" ? skuEv?.autoets : skuEv?.seasonal_naive);
+                  return {
+                    key,
+                    name: key === "SeasonalNaive" ? "Seasonal Naive" : key === "CrostonSBA" ? "Croston SBA" : "AutoETS",
+                    metrics,
+                    isChosen: key === chosenModel,
+                  };
+                });
+
+                return (
+                  <div
+                    key={sku.sku_id}
+                    className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-4 flex flex-col gap-3 shadow-md"
+                  >
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/[0.04] pb-2.5">
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-xs font-bold text-slate-100">
+                          {sku.sku_id}
+                        </span>
+                        {sku.demand_class && (
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-sans font-medium uppercase ${
+                              getDemandClassBadge(sku.demand_class).className
+                            }`}
+                          >
+                            {getDemandClassBadge(sku.demand_class).label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-slate-400">Chosen Model:</span>
+                        <span className="px-2 py-0.5 rounded text-[11px] font-mono font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
+                          {chosenModel === "SeasonalNaive"
+                            ? "Seasonal Naive"
+                            : chosenModel === "CrostonSBA"
+                              ? "Croston SBA"
+                              : "AutoETS"}
+                        </span>
+                        {maseImprovement > 0 ? (
+                          <span className="text-[11px] font-medium text-emerald-400">
+                            +{fmtNum(maseImprovement, 1)}% vs Seasonal Naive
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-500">
+                            Baseline
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs font-mono">
+                        <thead>
+                          <tr className="border-b border-white/[0.04] text-slate-500 bg-white/[0.01]">
+                            <th scope="col" className="px-3 py-1.5 font-medium font-sans">
+                              Candidate Model
+                            </th>
+                            <th scope="col" className="px-3 py-1.5 text-right font-medium">
+                              MAE
+                            </th>
+                            <th scope="col" className="px-3 py-1.5 text-right font-medium">
+                              RMSE
+                            </th>
+                            <th scope="col" className="px-3 py-1.5 text-right font-medium">
+                              WAPE
+                            </th>
+                            <th scope="col" className="px-3 py-1.5 text-right font-medium">
+                              MASE
+                            </th>
+                            <th scope="col" className="px-3 py-1.5 text-right font-medium">
+                              P10–P90 Coverage
+                            </th>
+                            <th scope="col" className="px-3 py-1.5 text-center font-medium font-sans">
+                              Selection
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/[0.02] text-slate-300">
+                          {displayModels.map(({ key, name, metrics, isChosen }) => (
+                            <tr
+                              key={key}
+                              className={
+                                isChosen
+                                  ? "bg-indigo-600/15 border-l-2 border-indigo-500 font-semibold text-white"
+                                  : "hover:bg-white/[0.01]"
+                              }
+                            >
+                              <td className="px-3 py-2 font-sans flex items-center gap-2">
+                                <span>{name}</span>
+                                {isChosen && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-bold uppercase bg-indigo-500/30 text-indigo-200">
+                                    Lowest MASE
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {fmtNum(metrics?.mae, 2)}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {fmtNum(metrics?.rmse, 2)}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {fmtPct(metrics?.wape, 1)}
+                              </td>
+                              <td
+                                className={`px-3 py-2 text-right ${
+                                  isChosen ? "text-indigo-300 font-bold" : ""
+                                }`}
+                              >
+                                {fmtNum(metrics?.mase, 3)}
+                              </td>
+                              <td className="px-3 py-2 text-right">
+                                {fmtPct(metrics?.coverage ?? skuEv?.interval_metrics?.coverage, 1)}
+                              </td>
+                              <td className="px-3 py-2 text-center font-sans">
+                                {isChosen ? (
+                                  <span className="text-[11px] text-indigo-400 font-semibold">
+                                    Active Model
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] text-slate-500">
+                                    Candidate
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
           {/* Footer Action */}

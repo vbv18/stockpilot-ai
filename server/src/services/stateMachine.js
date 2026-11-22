@@ -43,6 +43,7 @@ export const ACTION_ALLOWED_FROM = {
   ],
   optimize: ["assumptions_pending", "optimization_failed"],
   simulate: ["optimization_ready", "simulation_failed", "completed"],
+  portfolio: ["completed", "simulation_failed"],
   aiEligible: [
     "forecast_ready",
     "assumptions_pending",
@@ -62,4 +63,5 @@ export const STATUS_AFTER_CANCEL = {
   forecast: "dataset_ready",
   optimization: "assumptions_pending",
   simulation: "optimization_ready",
+  portfolio: "completed",
 };

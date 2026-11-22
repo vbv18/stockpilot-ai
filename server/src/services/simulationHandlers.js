@@ -46,6 +46,8 @@ registerJobHandler("simulation", {
       seed,
       policyDefinitions: {
         deterministic: "ROP_d = mu_L + z*sigma_L, order quantity EOQ",
+        quantile:
+          "ROP_q = ceil(mean_L + z*sigma_est), sigma_est = (P90 - P10) / 2.563, order quantity EOQ",
         uncertainty_aware:
           "ROP_u = empirical alpha-quantile of simulated lead-time demand, order quantity EOQ",
         reviewPeriod: "daily",
@@ -70,26 +72,30 @@ registerJobHandler("simulation", {
         sku_id: optSku.sku_id,
         forecast_mean: fcSku.autoets_mean,
         residual_blocks: fcSku.residual_blocks,
+        residual_std: fcSku.residual_std ?? optSku.sigma_daily_error,
         eoq: optSku.eoq,
         rop_deterministic: optSku.rop_deterministic,
         rop_uncertainty_aware: optSku.rop_uncertainty_aware,
+        rop_quantile: optSku.rop_quantile ?? optSku.rop_uncertainty_aware,
       });
     }
 
     const blockSize = optRun.policyConfig?.blockSize ?? 7;
 
+    const skusMap =
+      assumptionSet.skus instanceof Map
+        ? Object.fromEntries(assumptionSet.skus)
+        : assumptionSet.skus || {};
+
     const pyRequest = {
       skus: simulateSkus,
       params: {
-        ordering_cost: assumptionSet.orderingCost,
-        holding_cost_daily: holdingCostDaily(assumptionSet),
-        shortage_penalty: assumptionSet.shortagePenalty,
-        lead_time_days: assumptionSet.leadTimeDays,
         n_scenarios: nScenarios,
         horizon_days: horizonDays,
         block_size: blockSize,
         seed,
       },
+      assumptions: skusMap,
     };
     PySimulateRequest.parse(pyRequest);
 
@@ -106,6 +112,13 @@ registerJobHandler("simulation", {
     );
 
     simRun.policyResults = simulateResponse;
+    simRun.sweep =
+      simulateResponse.sweep ||
+      Object.fromEntries(
+        (simulateResponse.skus || [])
+          .filter((s) => s.sweep)
+          .map((s) => [s.sku_id, s.sweep]),
+      );
     simRun.status = "succeeded";
     await simRun.save();
 

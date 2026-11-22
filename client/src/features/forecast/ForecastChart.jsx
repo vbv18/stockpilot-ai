@@ -11,6 +11,7 @@ import {
 } from "recharts";
 import { COPY } from "../../lib/copy.js";
 import { fmtNum, fmtPct } from "../../lib/format.js";
+import { getDemandClassBadge } from "./ForecastPage.jsx";
 
 export function ForecastChart({
   skuId,
@@ -127,13 +128,24 @@ export function ForecastChart({
       {/* Header & Toggle */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <span className="font-mono text-xs font-semibold text-indigo-400">
-            {skuId}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="font-mono text-xs font-semibold text-indigo-400">
+              {skuId}
+            </span>
+            {skuForecast?.demand_class && (
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-sans font-medium uppercase tracking-wider ${
+                  getDemandClassBadge(skuForecast.demand_class).className
+                }`}
+              >
+                {getDemandClassBadge(skuForecast.demand_class).label}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-300 font-medium mt-0.5">
-            {skuId}: AutoETS averages {fmtNum(avgForecast, 1)} units/day over
-            the next 28 days; P10-P90 average {fmtNum(avgP10, 1)}-
-            {fmtNum(avgP90, 1)}.
+            {skuId}: {skuForecast?.autoets_model_spec || "AutoETS"} averages{" "}
+            {fmtNum(avgForecast, 1)} units/day over the next 28 days; P10-P90
+            average {fmtNum(avgP10, 1)}-{fmtNum(avgP90, 1)}.
           </p>
         </div>
 
@@ -282,6 +294,19 @@ export function ForecastChart({
       {/* Holdout metrics table if holdout view */}
       {isHoldoutView && skuEvaluation && (
         <div className="mt-2 border-t border-white/[0.06] pt-3 overflow-x-auto">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-semibold text-slate-300">
+              8-Origin Rolling Evaluation & Selection
+            </span>
+            {skuEvaluation.chosen_model && (
+              <span className="text-[11px] font-sans text-indigo-300">
+                Chosen: <span className="font-semibold">{skuEvaluation.chosen_model}</span>
+                {skuEvaluation.mase_improvement > 0
+                  ? ` (+${fmtNum(skuEvaluation.mase_improvement, 1)}% vs Seasonal Naive)`
+                  : " (Baseline)"}
+              </span>
+            )}
+          </div>
           <table className="w-full text-left text-xs font-mono">
             <thead>
               <tr className="border-b border-white/[0.04] text-slate-500">
@@ -298,48 +323,83 @@ export function ForecastChart({
                   WAPE
                 </th>
                 <th scope="col" className="py-1 text-right">
-                  Coverage
+                  MASE
                 </th>
                 <th scope="col" className="py-1 text-right">
-                  Width
+                  Coverage (80%)
+                </th>
+                <th scope="col" className="py-1 text-center">
+                  Status
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.02] text-slate-300">
-              <tr>
-                <td className="py-1 font-sans text-indigo-300">AutoETS</td>
-                <td className="py-1 text-right">
-                  {fmtNum(skuEvaluation.autoets?.mae, 2)}
-                </td>
-                <td className="py-1 text-right">
-                  {fmtNum(skuEvaluation.autoets?.rmse, 2)}
-                </td>
-                <td className="py-1 text-right">
-                  {fmtPct(skuEvaluation.autoets?.wape, 1)}
-                </td>
-                <td className="py-1 text-right">
-                  {fmtPct(skuEvaluation.interval_metrics?.coverage, 1)}
-                </td>
-                <td className="py-1 text-right">
-                  {fmtNum(skuEvaluation.interval_metrics?.mean_width, 1)}
-                </td>
-              </tr>
-              <tr>
-                <td className="py-1 font-sans text-amber-300">
-                  Seasonal Naive
-                </td>
-                <td className="py-1 text-right">
-                  {fmtNum(skuEvaluation.seasonal_naive?.mae, 2)}
-                </td>
-                <td className="py-1 text-right">
-                  {fmtNum(skuEvaluation.seasonal_naive?.rmse, 2)}
-                </td>
-                <td className="py-1 text-right">
-                  {fmtPct(skuEvaluation.seasonal_naive?.wape, 1)}
-                </td>
-                <td className="py-1 text-right">-</td>
-                <td className="py-1 text-right">-</td>
-              </tr>
+              {[
+                {
+                  key: "AutoETS",
+                  name: "AutoETS",
+                  metrics: skuEvaluation.models?.AutoETS || skuEvaluation.autoets,
+                  isChosen: skuEvaluation.chosen_model === "AutoETS",
+                },
+                {
+                  key: "SeasonalNaive",
+                  name: "Seasonal Naive",
+                  metrics: skuEvaluation.models?.SeasonalNaive || skuEvaluation.seasonal_naive,
+                  isChosen: skuEvaluation.chosen_model === "SeasonalNaive",
+                },
+                ...(skuEvaluation.models?.CrostonSBA || skuEvaluation.croston_sba
+                  ? [
+                      {
+                        key: "CrostonSBA",
+                        name: "Croston SBA",
+                        metrics: skuEvaluation.models?.CrostonSBA || skuEvaluation.croston_sba,
+                        isChosen: skuEvaluation.chosen_model === "CrostonSBA",
+                      },
+                    ]
+                  : []),
+              ].map(({ key, name, metrics, isChosen }) => (
+                <tr
+                  key={key}
+                  className={
+                    isChosen
+                      ? "bg-indigo-600/15 font-semibold text-white border-l-2 border-indigo-500"
+                      : ""
+                  }
+                >
+                  <td className="py-1.5 px-2 font-sans flex items-center gap-1.5">
+                    <span>{name}</span>
+                    {isChosen && (
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-bold uppercase bg-indigo-500/30 text-indigo-200">
+                        Selected
+                      </span>
+                    )}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {fmtNum(metrics?.mae, 2)}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {fmtNum(metrics?.rmse, 2)}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {fmtPct(metrics?.wape, 1)}
+                  </td>
+                  <td
+                    className={`py-1.5 text-right ${isChosen ? "text-indigo-300 font-bold" : ""}`}
+                  >
+                    {fmtNum(metrics?.mase, 3)}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {fmtPct(metrics?.coverage ?? skuEvaluation.interval_metrics?.coverage, 1)}
+                  </td>
+                  <td className="py-1.5 text-center font-sans">
+                    {isChosen ? (
+                      <span className="text-[10px] text-indigo-400 font-semibold">Active</span>
+                    ) : (
+                      <span className="text-[10px] text-slate-500">Candidate</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>

@@ -103,6 +103,12 @@ router.patch(
       if (body.archived !== undefined) {
         session.archivedAt = body.archived ? new Date() : null;
       }
+      if (body.budget !== undefined) {
+        session.budget = body.budget;
+      }
+      if (body.capacity !== undefined) {
+        session.capacity = body.capacity;
+      }
       await session.save();
 
       return res.status(200).json({ data: toSessionDto(session) });

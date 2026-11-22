@@ -59,18 +59,19 @@ registerJobHandler("optimization", {
       residual_std: s.residual_std,
     }));
 
+    const skusMap =
+      assumptionSet.skus instanceof Map
+        ? Object.fromEntries(assumptionSet.skus)
+        : assumptionSet.skus || {};
+
     const pyRequest = {
       skus: optimizeSkus,
       params: {
-        ordering_cost: assumptionSet.orderingCost,
-        holding_cost_daily: holdingCostDaily(assumptionSet),
-        shortage_penalty: assumptionSet.shortagePenalty,
-        lead_time_days: assumptionSet.leadTimeDays,
-        target_service_level: assumptionSet.targetServiceLevel,
         n_bootstrap: nBootstrap,
         block_size: blockSize,
         bootstrap_seed: bootstrapSeed,
       },
+      assumptions: skusMap,
     };
     PyOptimizeRequest.parse(pyRequest);
 

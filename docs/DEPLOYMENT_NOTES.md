@@ -30,12 +30,13 @@ This document outlines deployment architectures, interface binding, network boun
   - Whitelist only the IP addresses or VPC CIDR blocks of Node.js backend nodes.
   - Enable TLS encryption in transit (`tls=true` in MongoDB connection URI).
 
-### 1.4 Redis Cache & Job Queues
+### 1.4 In-Process MongoDB-Backed Job Queue (`server/src/services/jobRunner.js`)
 
-- **Security Requirement**: Redis coordinates job locks, distributed idempotency keys, and BullMQ task queues.
-- **Access Boundary**:
-  - Require strong authentication (`requirepass` or Upstash Redis token).
-  - Use TLS connections (`rediss://`) when connecting over external networks.
+- **Architecture**: Asynchronous background jobs (dataset ingestion, demand forecasting, inventory policy optimization, Monte Carlo simulation) run in-process within the Node.js server. Persistent job status, logs, progress, and outcomes are tracked in MongoDB via the `Job` collection (`server/src/models/job.model.js`).
+- **Concurrency Control**: Enforced using an in-process counting semaphore bounded by the `JOB_CONCURRENCY` environment setting (defaults to 2). When capacity is reached, excess jobs wait in an in-memory queue.
+- **Deduplication & Idempotency**: Jobs compute a SHA-256 hash of canonical JSON `(stage, sessionId, hashInput)`. A compound unique index on `{ sessionId, stage, inputHash, status }` in MongoDB prevents redundant overlapping executions for the same stage and inputs.
+- **Cancellation & Lifecycle**: Job cancellation is supported via cooperative `AbortController` signals (`runningControllers` map) and database flags (`cancelRequested`). When cancelled, active stage execution halts, transitions status to `cancelled`, and runs stage-specific `onCancelled` cleanup.
+- **Crash Recovery**: On server startup, `recoverInterruptedJobs()` detects orphaned `queued` or `running` jobs in MongoDB left by prior server crashes or restarts, marks them `failed` with error code `SERVER_RESTART` (retryable), and executes failure cleanup callbacks.
 
 ---
 

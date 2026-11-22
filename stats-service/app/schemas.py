@@ -17,6 +17,7 @@ SeedT = Annotated[int, Field(ge=0, le=2147483647)]
 
 SkuStatus = Literal["ok", "insufficient_history", "no_demand", "model_failed"]
 IntervalStatus = Literal["ok", "insufficient_residuals", "not_computed"]
+DemandClass = Literal["smooth", "erratic", "intermittent", "lumpy"]
 
 
 class SkuSeries(Strict):
@@ -62,6 +63,11 @@ class SkuForecast(Strict):
     sku_id: SkuIdT
     status: SkuStatus
     interval_status: IntervalStatus
+    demand_class: DemandClass
+    adi: Fin
+    cv2: Fin
+    chosen_model: Optional[str] = None
+    mase_improvement: Optional[Fin] = None
     message: Optional[str] = None
     n_observations: int
     forecast_start_date: Optional[date] = None
@@ -95,6 +101,8 @@ class PointMetrics(Strict):
     wape_status: Literal["ok", "zero_denominator"]
     sum_abs_error: NonNeg
     sum_actual: NonNeg
+    mase: Optional[Fin] = None
+    coverage: Optional[NonNeg] = None
 
 
 class IntervalMetrics(Strict):
@@ -117,6 +125,10 @@ class SkuEvaluation(Strict):
     intervals: Optional[IntervalBand] = None
     autoets: Optional[PointMetrics] = None
     seasonal_naive: Optional[PointMetrics] = None
+    croston_sba: Optional[PointMetrics] = None
+    chosen_model: Optional[str] = None
+    mase_improvement: Optional[Fin] = None
+    models: Optional[dict[str, PointMetrics]] = None
     interval_metrics: Optional[IntervalMetrics] = None
     n_residual_blocks: int
     warnings: list[str] = Field(default_factory=list)
@@ -127,11 +139,14 @@ class ModelAggregate(Strict):
     mae_mean: Optional[Fin] = None
     rmse_mean: Optional[Fin] = None
     wape_pooled: Optional[Fin] = None
+    mase_mean: Optional[Fin] = None
+    coverage_mean: Optional[Fin] = None
 
 
 class EvaluateAggregate(Strict):
     autoets: ModelAggregate
     seasonal_naive: ModelAggregate
+    croston_sba: Optional[ModelAggregate] = None
     n_skus_with_intervals: int
     coverage_mean: Optional[Fin] = None
     mean_width_mean: Optional[Fin] = None
@@ -152,12 +167,17 @@ class OptimizeSkuInput(Strict):
     residual_std: NonNeg
 
 
-class OptimizeParams(Strict):
+class SkuAssumptions(Strict):
     ordering_cost: float = Field(gt=0, le=1e9, allow_inf_nan=False)
-    holding_cost_daily: float = Field(gt=0, le=1e9, allow_inf_nan=False)
+    holding_cost_annual: float = Field(gt=0, le=1e9, allow_inf_nan=False)
     shortage_penalty: float = Field(gt=0, le=1e9, allow_inf_nan=False)
-    lead_time_days: int = Field(ge=1, le=28)
-    target_service_level: float = Field(gt=0, lt=1)
+    lead_time_mean: int = Field(ge=1, le=28)
+    lead_time_std: float = Field(default=0.0, ge=0, le=28, allow_inf_nan=False)
+    service_level: float = Field(ge=0.80, le=0.99, allow_inf_nan=False)
+    unit_cost: float = Field(gt=0, le=1e9, allow_inf_nan=False)
+
+
+class OptimizeParams(Strict):
     n_bootstrap: int = Field(500, ge=100, le=2000)
     block_size: int = Field(7, ge=1, le=14)
     bootstrap_seed: SeedT
@@ -166,6 +186,7 @@ class OptimizeParams(Strict):
 class OptimizeRequest(Strict):
     skus: list[OptimizeSkuInput] = Field(min_length=1, max_length=100)
     params: OptimizeParams
+    assumptions: dict[SkuIdT, SkuAssumptions]
 
 
 class LeadTimeDemandStats(Strict):
@@ -198,6 +219,9 @@ class SkuOptimization(Strict):
     rop_uncertainty_aware: Optional[int] = None
     safety_stock_uncertainty_aware: Optional[Fin] = None
     rop_gap: Optional[int] = None
+    rop_quantile_raw: Optional[Fin] = None
+    rop_quantile: Optional[int] = None
+    safety_stock_quantile: Optional[Fin] = None
     warnings: list[str] = Field(default_factory=list)
 
 
@@ -208,20 +232,33 @@ class OptimizeResponse(Strict):
 
 
 # ---------- simulate ----------
+class SweepPoint(Strict):
+    service_level: Fin
+    total_cost: Fin
+    fill_rate: Fin
+    avg_inventory: Optional[Fin] = None
+    rop: Optional[int] = None
+
+
+class SkuSweep(Strict):
+    sku_id: SkuIdT
+    deterministic: list[SweepPoint]
+    uncertainty_aware: list[SweepPoint]
+    quantile: Optional[list[SweepPoint]] = None
+
+
 class SimulateSkuInput(Strict):
     sku_id: SkuIdT
     forecast_mean: list[NonNeg] = Field(min_length=1, max_length=56)
     residual_blocks: list[list[Fin]] = Field(min_length=1, max_length=500)
+    residual_std: Optional[NonNeg] = None
     eoq: int = Field(ge=1)
     rop_deterministic: int = Field(ge=0)
     rop_uncertainty_aware: int = Field(ge=0)
+    rop_quantile: Optional[int] = Field(default=None, ge=0)
 
 
 class SimulateParams(Strict):
-    ordering_cost: float = Field(gt=0, le=1e9, allow_inf_nan=False)
-    holding_cost_daily: float = Field(gt=0, le=1e9, allow_inf_nan=False)
-    shortage_penalty: float = Field(gt=0, le=1e9, allow_inf_nan=False)
-    lead_time_days: int = Field(ge=1, le=28)
     n_scenarios: int = Field(500, ge=100, le=2000)
     horizon_days: int = Field(90, ge=30, le=180)
     block_size: int = Field(7, ge=1, le=14)
@@ -231,6 +268,7 @@ class SimulateParams(Strict):
 class SimulateRequest(Strict):
     skus: list[SimulateSkuInput] = Field(min_length=1, max_length=100)
     params: SimulateParams
+    assumptions: dict[SkuIdT, SkuAssumptions]
 
 
 class PolicyMetrics(Strict):
@@ -261,7 +299,9 @@ class SkuSimulation(Strict):
     mean_total_demand: NonNeg
     deterministic: PolicyMetrics
     uncertainty_aware: PolicyMetrics
+    quantile: Optional[PolicyMetrics] = None
     paired: PairedComparison
+    sweep: Optional[SkuSweep] = None
 
 
 class AggregatePolicyMetrics(Strict):
@@ -279,6 +319,7 @@ class AggregatePolicyMetrics(Strict):
 class SimulateAggregate(Strict):
     deterministic: AggregatePolicyMetrics
     uncertainty_aware: AggregatePolicyMetrics
+    quantile: Optional[AggregatePolicyMetrics] = None
     mean_total_cost_diff_sum: Fin
 
 
@@ -287,3 +328,109 @@ class SimulateResponse(Strict):
     params: SimulateParams
     skus: list[SkuSimulation]
     aggregate: SimulateAggregate
+    sweep: Optional[dict[SkuIdT, SkuSweep]] = None
+
+
+# ---------- replay ----------
+class ReplayParams(Strict):
+    seed: SeedT = 42
+    holdout_days: int = Field(28, ge=7, le=56)
+    season_length: int = Field(7, ge=2, le=14)
+    n_bootstrap: int = Field(500, ge=100, le=2000)
+    block_size: int = Field(7, ge=1, le=14)
+    min_history: int = Field(56, ge=28, le=365)
+    origin_step: int = Field(7, ge=1, le=28)
+    min_residual_blocks: int = Field(8, ge=2, le=100)
+
+
+class ReplayRequest(Strict):
+    series: list[SkuSeries] = Field(min_length=1, max_length=100)
+    params: ReplayParams = Field(default_factory=ReplayParams)
+    assumptions: dict[SkuIdT, SkuAssumptions]
+
+
+class ReplayPolicyMetrics(Strict):
+    fill_rate: Fin
+    total_cost: Fin
+    stockout_days: int
+
+
+class SkuReplay(Strict):
+    sku_id: SkuIdT
+    status: Literal["ok", "insufficient_history", "no_demand", "model_failed", "ineligible", "failed"]
+    deterministic: Optional[ReplayPolicyMetrics] = None
+    uncertainty_aware: Optional[ReplayPolicyMetrics] = None
+    quantile: Optional[ReplayPolicyMetrics] = None
+    det: Optional[ReplayPolicyMetrics] = None
+    unc: Optional[ReplayPolicyMetrics] = None
+    message: Optional[str] = None
+
+
+class ReplayAggregate(Strict):
+    deterministic: Optional[ReplayPolicyMetrics] = None
+    uncertainty_aware: Optional[ReplayPolicyMetrics] = None
+    quantile: Optional[ReplayPolicyMetrics] = None
+    det: Optional[ReplayPolicyMetrics] = None
+    unc: Optional[ReplayPolicyMetrics] = None
+
+
+class ReplayResponse(Strict):
+    run_meta: RunMeta
+    params: ReplayParams
+    skus: list[SkuReplay]
+    aggregate: Optional[ReplayAggregate] = None
+
+
+# ---------- portfolio ----------
+class PortfolioCurvePoint(Strict):
+    service_level: Fin
+    rop: int
+    total_cost: Fin
+    avg_inventory: Fin
+    fill_rate: Optional[Fin] = None
+
+
+class PortfolioSkuInput(Strict):
+    sku_id: SkuIdT
+    unit_cost: float = Field(gt=0, le=1e9, allow_inf_nan=False)
+    annual_demand: float = Field(ge=0, allow_inf_nan=False)
+    curve: list[PortfolioCurvePoint] = Field(min_length=1)
+
+
+class PortfolioRequest(Strict):
+    skus: list[PortfolioSkuInput] = Field(min_length=1)
+    budget: Optional[float] = Field(default=None, gt=0, allow_inf_nan=False)
+    capacity: Optional[float] = Field(default=None, gt=0, allow_inf_nan=False)
+
+
+class SkuPortfolioPlan(Strict):
+    sku_id: SkuIdT
+    service_level: Fin
+    rop: int
+    avg_inventory: Fin
+    inventory_investment: Fin
+    total_cost: Fin
+    turnover: Fin
+
+
+class PortfolioPlanSummary(Strict):
+    skus: list[SkuPortfolioPlan]
+    total_cost: Fin
+    total_inventory_investment: Fin
+    total_units: Fin
+    avg_service_level: Fin
+    turnover: Fin
+
+
+class PortfolioResponse(Strict):
+    run_meta: RunMeta
+    unconstrained_plan: PortfolioPlanSummary
+    constrained_plan: PortfolioPlanSummary
+    total_cost_delta: Fin
+    binding_constraints: list[str]
+    budget_shadow_price: Fin
+    budget: Optional[Fin] = None
+    capacity: Optional[Fin] = None
+    budget_usage_pct: Optional[Fin] = None
+    capacity_usage_pct: Optional[Fin] = None
+

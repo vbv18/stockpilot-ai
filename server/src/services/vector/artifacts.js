@@ -11,6 +11,11 @@ export const ARTIFACT_TYPES = [
   "optimization_aggregate",
   "simulation_sku",
   "simulation_aggregate",
+  "portfolio_aggregate",
+  "portfolio_sku",
+  "replay_aggregate",
+  "replay_sku",
+  "backtest_aggregate",
 ];
 
 const n = (x, d = 2) =>
@@ -32,6 +37,8 @@ export function buildArtifactDocs(bundle) {
     assumptions,
     optimizationRun,
     simulationRun,
+    portfolioRun,
+    replayRun,
     history,
   } = bundle;
   const docs = [];
@@ -56,10 +63,18 @@ export function buildArtifactDocs(bundle) {
     );
   }
   if (assumptions) {
-    const a = assumptions.values || {};
+    const skusMap =
+      assumptions.skus instanceof Map
+        ? Object.fromEntries(assumptions.skus)
+        : assumptions.skus ||
+          (assumptions.toObject
+            ? assumptions.toObject({ flattenMaps: true }).skus
+            : {}) ||
+          {};
     const v = assumptions.version ?? 1;
+    const nSkus = Object.keys(skusMap).length;
     overviewParts.push(
-      `Assumptions version ${v}: ordering cost ${n(a.orderingCost)} INR per order, holding cost ${n(a.holdingCost)} INR ${a.holdingCostUnit || "per_unit_per_day"}, shortage penalty ${n(a.shortagePenalty)} INR per unit, lead time ${a.leadTimeDays ?? "n/a"} days, target service level ${n((a.targetServiceLevel ?? 0) * 100, 1)}%.`,
+      `Assumptions version ${v} covering ${nSkus} SKUs with per-SKU parameters.`,
     );
   }
   if (optimizationRun) {
@@ -76,6 +91,18 @@ export function buildArtifactDocs(bundle) {
     const sd = simulationRun.seed ?? "n/a";
     overviewParts.push(
       `Simulation run ${simulationRun._id}: ${sc} scenarios over ${hz} days, seed ${sd}.`,
+    );
+  }
+  if (portfolioRun) {
+    const b = portfolioRun.budget ? `${n(portfolioRun.budget)} budget` : "no budget limit";
+    const c = portfolioRun.capacity ? `${n(portfolioRun.capacity)} units capacity` : "no capacity limit";
+    overviewParts.push(
+      `Portfolio run ${portfolioRun._id}: multi-SKU optimization with ${b}, ${c}.`,
+    );
+  }
+  if (replayRun) {
+    overviewParts.push(
+      `Replay run ${replayRun._id}: tested on actual historical demand over ${replayRun.holdoutDays ?? 28} holdout days.`,
     );
   }
   docs.push({
@@ -139,18 +166,31 @@ export function buildArtifactDocs(bundle) {
   }
 
   // 4. forecast_sku & 5. evaluation_sku
-  if (forecastRun && forecastRun.result?.skus) {
+  const rawFcSkus =
+    forecastRun?.result?.forecast?.skus ||
+    forecastRun?.result?.skus ||
+    null;
+  if (forecastRun && rawFcSkus) {
     const forecastRunId = forecastRun._id.toString();
-    const skusMap = forecastRun.result.skus;
-    const evalMap = forecastRun.result.evaluation?.skus || {};
+    const skusMap = Array.isArray(rawFcSkus)
+      ? Object.fromEntries(rawFcSkus.map((s) => [s.sku_id, s]))
+      : rawFcSkus;
+    const rawEvalSkus = forecastRun.result?.evaluation?.skus || {};
+    const evalMap = Array.isArray(rawEvalSkus)
+      ? Object.fromEntries(rawEvalSkus.map((e) => [e.sku_id, e]))
+      : rawEvalSkus;
 
     for (const [skuId, skuData] of Object.entries(skusMap)) {
+      const demandClass = skuData.demand_class || "smooth";
+      const adiStr = n(skuData.adi);
+      const cv2Str = n(skuData.cv2);
+
       if (skuData.status !== "ok") {
         docs.push({
           artifactType: "forecast_sku",
           artifactId: forecastRunId,
           skuId,
-          text: `SKU ${skuId}: status ${skuData.status}, interval status ${skuData.interval_status}, ${skuData.n_observations ?? 0} observations. ${skuData.message || ""}`.slice(
+          text: `SKU ${skuId}: demand class ${demandClass}, status ${skuData.status}, interval status ${skuData.interval_status}, ${skuData.n_observations ?? 0} observations. ${skuData.message || ""}`.slice(
             0,
             1500,
           ),
@@ -162,8 +202,8 @@ export function buildArtifactDocs(bundle) {
             ? meanArr.reduce((a, b) => a + b, 0) / meanArr.length
             : 0;
         const total = meanArr.reduce((a, b) => a + b, 0);
-        const p10Arr = skuData.p10 || [];
-        const p90Arr = skuData.p90 || [];
+        const p10Arr = skuData.p10 || skuData.intervals?.p10 || [];
+        const p90Arr = skuData.p90 || skuData.intervals?.p90 || [];
         const p10avg =
           p10Arr.length > 0
             ? p10Arr.reduce((a, b) => a + b, 0) / p10Arr.length
@@ -176,7 +216,7 @@ export function buildArtifactDocs(bundle) {
         const rs = n(skuData.residual_std);
         const blocks = skuData.residual_blocks
           ? skuData.residual_blocks.length
-          : 0;
+          : (skuData.n_residual_blocks ?? 0);
 
         // History calculations for last 28, prior 28, zero days
         const sHistory = historyBySku.get(skuId) || [];
@@ -199,11 +239,18 @@ export function buildArtifactDocs(bundle) {
             ? skuData.warnings.join("; ")
             : "none";
 
+        const modelSpec =
+          skuData.autoets_model_spec || skuData.model_spec || "AutoETS";
+        const fcStartDate =
+          forecastRun.result?.forecast_start_date ||
+          forecastRun.result?.forecast?.skus?.[0]?.forecast_start_date ||
+          "start";
+
         docs.push({
           artifactType: "forecast_sku",
           artifactId: forecastRunId,
           skuId,
-          text: `SKU ${skuId}: status ${skuData.status}, interval status ${skuData.interval_status}, ${skuData.n_observations} observations. AutoETS model ${skuData.model_spec || "AutoETS"}. Next 28 days from ${forecastRun.result.forecast_start_date || "start"}: forecast averages ${n(avg)} units/day (total ${n(total)}); P10-P90 band averages ${n(p10avg)} to ${n(p90avg)} units/day. Residual standard deviation ${rs} from ${blocks} residual blocks. Recent demand: last 28 days averaged ${r28} units/day versus ${p28} in the prior 28 days; zero-demand days in the last 56 days: ${z}. Warnings: ${warningsStr}.`.slice(
+          text: `SKU ${skuId}: demand class ${demandClass} (ADI ${adiStr}, CV² ${cv2Str}), status ${skuData.status}, interval status ${skuData.interval_status}, ${skuData.n_observations} observations. Model ${modelSpec}. Next 28 days from ${fcStartDate}: forecast averages ${n(avg)} units/day (total ${n(total)}); P10-P90 band averages ${n(p10avg)} to ${n(p90avg)} units/day. Residual standard deviation ${rs} from ${blocks} residual blocks. Recent demand: last 28 days averaged ${r28} units/day versus ${p28} in the prior 28 days; zero-demand days in the last 56 days: ${z}. Warnings: ${warningsStr}.`.slice(
             0,
             1500,
           ),
@@ -234,7 +281,7 @@ export function buildArtifactDocs(bundle) {
           artifactType: "evaluation_sku",
           artifactId: forecastRunId,
           skuId,
-          text: `Holdout evaluation for SKU ${skuId} (last 28 days): AutoETS MAE ${n(ae.mae)}, RMSE ${n(ae.rmse)}, ${wapeAe} ; Seasonal Naive MAE ${n(sn.mae)}, RMSE ${n(sn.rmse)}, ${wapeSn}; P10-P90 coverage ${cov} (nominal 80%), mean width ${width} units.`.slice(
+          text: `Evaluation for SKU ${skuId} (8-origin rolling backtest): Chosen model ${evalData.chosen_model || "AutoETS"} (${evalData.mase_improvement ? n(evalData.mase_improvement, 1) + "% vs SeasonalNaive" : "baseline"}). AutoETS MAE ${n(ae.mae)}, RMSE ${n(ae.rmse)}, MASE ${n(ae.mase)}, ${wapeAe}; Seasonal Naive MAE ${n(sn.mae)}, RMSE ${n(sn.rmse)}, MASE ${n(sn.mase)}, ${wapeSn}; P10-P90 coverage ${cov} (nominal 80%), mean width ${width} units.`.slice(
             0,
             1500,
           ),
@@ -245,31 +292,31 @@ export function buildArtifactDocs(bundle) {
 
   // 6. assumption_set
   if (assumptions) {
-    const a = assumptions.values || {};
-    const prov = assumptions.provenance || {};
-    const provParts = [];
-    if (prov.orderingCost)
-      provParts.push(`ordering cost: ${prov.orderingCost}`);
-    if (prov.holdingCost) provParts.push(`holding cost: ${prov.holdingCost}`);
-    const provSummary =
-      provParts.length > 0 ? provParts.join("; ") : "user provided";
-
-    const S = n(a.orderingCost);
-    const H = n(a.holdingCost);
-    const unit = a.holdingCostUnit || "per_unit_per_day";
-    const Hday =
-      unit === "per_unit_per_year"
-        ? n(a.holdingCost / 365, 4)
-        : n(a.holdingCost);
-    const P = n(a.shortagePenalty);
-    const L = a.leadTimeDays ?? "n/a";
-    const SL = n((a.targetServiceLevel ?? 0) * 100, 1);
+    const skusMap =
+      assumptions.skus instanceof Map
+        ? Object.fromEntries(assumptions.skus)
+        : assumptions.skus ||
+          (assumptions.toObject
+            ? assumptions.toObject({ flattenMaps: true }).skus
+            : {}) ||
+          {};
+    const v = assumptions.version ?? 1;
+    const skuSummaries = Object.entries(skusMap).map(([sId, a]) => {
+      const S = n(a.ordering_cost);
+      const H = n(a.holding_cost_annual);
+      const Hday = n(a.holding_cost_annual / 365, 4);
+      const P = n(a.shortage_penalty);
+      const L = a.lead_time_mean ?? "n/a";
+      const SL = n((a.service_level ?? 0) * 100, 1);
+      const U = n(a.unit_cost);
+      return `SKU ${sId}: ordering cost ${S} INR, annual holding cost ${H} INR (${Hday} INR/day), shortage penalty ${P} INR, lead time ${L} days, target service level ${SL}%, unit cost ${U} INR.`;
+    });
 
     docs.push({
       artifactType: "assumption_set",
       artifactId: assumptions._id.toString(),
       skuId: null,
-      text: `Assumptions version ${assumptions.version ?? 1} (${provSummary}): ordering cost ${S} INR per order; holding cost ${H} INR ${unit} (${Hday} INR per unit per day); shortage penalty ${P} INR per unit; lead time ${L} days; target cycle service level ${SL}%.`.slice(
+      text: `Assumptions version ${v}: ${skuSummaries.join("; ")}`.slice(
         0,
         1500,
       ),
@@ -328,6 +375,7 @@ export function buildArtifactDocs(bundle) {
       const ssD = n(skuOpt.normal_ss);
       const sigL = n(skuOpt.sigma_l);
       const zVal = n(skuOpt.z_value);
+      const ropQ = skuOpt.rop_quantile ?? "n/a";
       const ropU = skuOpt.rop_uncertainty_aware ?? "n/a";
       const ssU = n(skuOpt.bootstrap_ss);
       const gap = skuOpt.rop_gap ?? 0;
@@ -353,7 +401,7 @@ export function buildArtifactDocs(bundle) {
         artifactType: "optimization_sku",
         artifactId: optRunId,
         skuId,
-        text: `SKU ${skuId}: EOQ ${eoq} units (annual demand ${D}). Expected lead-time demand ${muL} units. Deterministic ROP ${ropD} (safety stock ${ssD}, sigma_L ${sigL}, z ${zVal}). Uncertainty-aware ROP ${ropU} (safety stock ${ssU}); gap ${gap} units. Lead-time demand P10/P50/P90: ${a}/${b}/${c}, skewness ${s}. Risk level ${rLevel}; flags: ${flagsStr}. Warnings: ${warningsStr}.`.slice(
+        text: `SKU ${skuId}: EOQ ${eoq} units (annual demand ${D}). Expected lead-time demand ${muL} units. Deterministic ROP ${ropD} (safety stock ${ssD}, sigma_L ${sigL}, z ${zVal}). Quantile ROP ${ropQ}. Uncertainty-aware ROP ${ropU} (safety stock ${ssU}); gap ${gap} units. Lead-time demand P10/P50/P90: ${a}/${b}/${c}, skewness ${s}. Risk level ${rLevel}; flags: ${flagsStr}. Warnings: ${warningsStr}.`.slice(
           0,
           1500,
         ),
@@ -417,6 +465,114 @@ export function buildArtifactDocs(bundle) {
         artifactId: simRunId,
         skuId: null,
         text: `Simulation aggregate (${sc} scenarios, ${hz} days, seed ${sd}): Deterministic policy total mean cost ${n(d.mean_total_cost)} INR (ordering ${n(d.mean_ordering_cost)}, holding ${n(d.mean_holding_cost)}, shortage ${n(d.mean_shortage_cost)}), service level ${n((d.service_level ?? 0) * 100, 1)}%, stockout units ${n(d.mean_stockout_units)}. Uncertainty-aware policy total mean cost ${n(u.mean_total_cost)} INR (ordering ${n(u.mean_ordering_cost)}, holding ${n(u.mean_holding_cost)}, shortage ${n(u.mean_shortage_cost)}), service level ${n((u.service_level ?? 0) * 100, 1)}%, stockout units ${n(u.mean_stockout_units)}. Aggregate paired mean cost difference sum (uncertainty-aware minus deterministic): ${diffSum} INR.`.slice(
+          0,
+          1500,
+        ),
+      });
+    }
+  }
+
+  // 11. backtest_aggregate
+  if (forecastRun && forecastRun.result?.evaluation) {
+    const ev = forecastRun.result.evaluation;
+    const agg = ev.aggregate || {};
+    const autoets = agg.autoets || {};
+    const snaive = agg.seasonal_naive || {};
+    const croston = agg.croston_sba || {};
+    const rawSkus = ev.skus || {};
+    const skusList = Array.isArray(rawSkus)
+      ? rawSkus
+      : Object.values(rawSkus);
+    const chosenCounts = {};
+    for (const s of skusList) {
+      if (s.chosen_model) {
+        chosenCounts[s.chosen_model] = (chosenCounts[s.chosen_model] || 0) + 1;
+      }
+    }
+    const chosenSummary =
+      Object.entries(chosenCounts)
+        .map(([m, c]) => `${m}: ${c}`)
+        .join(", ") || "n/a";
+
+    docs.push({
+      artifactType: "backtest_aggregate",
+      artifactId: forecastRun._id.toString(),
+      skuId: null,
+      text: `Rolling backtest model comparison aggregate (8-origin evaluation across ${skusList.length} SKUs): Chosen model distribution: ${chosenSummary}. AutoETS pooled WAPE ${n((autoets.wape_pooled ?? 0) * 100, 1)}%, mean MAE ${n(autoets.mae_mean)}, mean RMSE ${n(autoets.rmse_mean)}, mean MASE ${n(autoets.mase_mean)}. Seasonal Naive pooled WAPE ${n((snaive.wape_pooled ?? 0) * 100, 1)}%, mean MAE ${n(snaive.mae_mean)}, mean RMSE ${n(snaive.rmse_mean)}, mean MASE ${n(snaive.mase_mean)}. Croston SBA pooled WAPE ${n((croston.wape_pooled ?? 0) * 100, 1)}%, mean MAE ${n(croston.mae_mean)}, mean RMSE ${n(croston.rmse_mean)}. Interval coverage: nominal 80%, mean coverage ${n((agg.coverage_mean ?? 0) * 100, 1)}%, mean width ${n(agg.mean_width_mean)} units.`.slice(
+        0,
+        1500,
+      ),
+    });
+  }
+
+  // 12. portfolio_aggregate & 13. portfolio_sku
+  if (portfolioRun && portfolioRun.result) {
+    const pr = portfolioRun.result;
+    const portRunId = portfolioRun._id.toString();
+    const binding =
+      pr.binding_constraints && pr.binding_constraints.length > 0
+        ? pr.binding_constraints.join(", ")
+        : "none";
+    const uPlan = pr.unconstrained_plan || {};
+    const cPlan = pr.constrained_plan || {};
+
+    docs.push({
+      artifactType: "portfolio_aggregate",
+      artifactId: portRunId,
+      skuId: null,
+      text: `Portfolio optimization aggregate: Budget ${n(pr.budget)} INR (usage ${n(pr.budget_usage_pct, 1)}%), Capacity ${n(pr.capacity)} units (usage ${n(pr.capacity_usage_pct, 1)}%). Binding constraints: ${binding}. Budget shadow price: ${n(pr.budget_shadow_price)} cost decrease per unit budget. Unconstrained plan: total cost ${n(uPlan.total_cost)} INR, inventory investment ${n(uPlan.total_inventory_investment)} INR, total units ${n(uPlan.total_units)}, avg service level ${n((uPlan.avg_service_level ?? 0) * 100, 1)}%, turnover ${n(uPlan.turnover)}. Constrained plan: total cost ${n(cPlan.total_cost)} INR, inventory investment ${n(cPlan.total_inventory_investment)} INR, total units ${n(cPlan.total_units)}, avg service level ${n((cPlan.avg_service_level ?? 0) * 100, 1)}%, turnover ${n(cPlan.turnover)}. Total cost delta (constrained minus unconstrained): ${n(pr.total_cost_delta)} INR.`.slice(
+        0,
+        1500,
+      ),
+    });
+
+    const uMap = new Map((uPlan.skus || []).map((s) => [s.sku_id, s]));
+    const cSkus = cPlan.skus || [];
+    for (const c of cSkus) {
+      const u = uMap.get(c.sku_id) || {};
+      const costDelta = n(c.total_cost - (u.total_cost ?? c.total_cost));
+      docs.push({
+        artifactType: "portfolio_sku",
+        artifactId: portRunId,
+        skuId: c.sku_id,
+        text: `Portfolio plan for SKU ${c.sku_id}: Unconstrained service level ${n((u.service_level ?? 0) * 100, 1)}%, ROP ${u.rop ?? "n/a"}, avg inventory ${n(u.avg_inventory)} units, investment ${n(u.inventory_investment)} INR, total cost ${n(u.total_cost)} INR, turnover ${n(u.turnover)}. Constrained service level ${n((c.service_level ?? 0) * 100, 1)}%, ROP ${c.rop ?? "n/a"}, avg inventory ${n(c.avg_inventory)} units, investment ${n(c.inventory_investment)} INR, total cost ${n(c.total_cost)} INR, turnover ${n(c.turnover)}. Cost delta ${costDelta} INR.`.slice(
+          0,
+          1500,
+        ),
+      });
+    }
+  }
+
+  // 14. replay_aggregate & 15. replay_sku
+  if (replayRun && replayRun.results) {
+    const repRunId = replayRun._id.toString();
+    const rr = replayRun.results;
+    const agg = rr.aggregate;
+    if (agg) {
+      const d = agg.deterministic || agg.det || {};
+      const u = agg.uncertainty_aware || agg.unc || {};
+      docs.push({
+        artifactType: "replay_aggregate",
+        artifactId: repRunId,
+        skuId: null,
+        text: `Replay on actual demand aggregate (${replayRun.holdoutDays ?? 28} holdout days): Deterministic policy fill rate ${n((d.fill_rate ?? 0) * 100, 1)}%, total cost ${n(d.total_cost)} INR, stockout days ${d.stockout_days ?? 0}. Uncertainty-aware policy fill rate ${n((u.fill_rate ?? 0) * 100, 1)}%, total cost ${n(u.total_cost)} INR, stockout days ${u.stockout_days ?? 0}.`.slice(
+          0,
+          1500,
+        ),
+      });
+    }
+
+    const repSkus = Array.isArray(rr.skus)
+      ? rr.skus
+      : Object.values(rr.skus || {});
+    for (const s of repSkus) {
+      const d = s.deterministic || s.det || {};
+      const u = s.uncertainty_aware || s.unc || {};
+      docs.push({
+        artifactType: "replay_sku",
+        artifactId: repRunId,
+        skuId: s.sku_id,
+        text: `Replay on actual demand for SKU ${s.sku_id} (${replayRun.holdoutDays ?? 28} holdout days): status ${s.status}. Deterministic policy fill rate ${n((d.fill_rate ?? 0) * 100, 1)}%, total cost ${n(d.total_cost)} INR, stockout days ${d.stockout_days ?? 0}. Uncertainty-aware policy fill rate ${n((u.fill_rate ?? 0) * 100, 1)}%, total cost ${n(u.total_cost)} INR, stockout days ${u.stockout_days ?? 0}.`.slice(
           0,
           1500,
         ),

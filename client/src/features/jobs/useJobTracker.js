@@ -32,6 +32,7 @@ export function useJobTracker(sessionId, jobId, onFinished) {
             { type: "Forecast", id: sessionId },
             { type: "Optimization", id: sessionId },
             { type: "Simulations", id: sessionId },
+            { type: "Portfolio", id: sessionId },
           ]),
         );
         if (onFinished) {

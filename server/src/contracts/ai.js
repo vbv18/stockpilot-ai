@@ -2,6 +2,7 @@ import { z } from "zod";
 import { IsoDate, ObjectIdString, SkuId } from "./common.js";
 import { HoldingCostUnit } from "./pipeline.js";
 import {
+  PyDemandClass,
   PyIntervalMetrics,
   PyIntervalStatus,
   PyPointMetrics,
@@ -19,6 +20,8 @@ export const TOOL_NAMES = [
   "compare_inventory_policies",
   "run_what_if_scenario",
   "get_inventory_risk_summary",
+  "get_portfolio_plan",
+  "get_model_comparison",
 ];
 export const ToolName = z.enum(TOOL_NAMES);
 
@@ -40,23 +43,25 @@ export const CompareInventoryPoliciesInput = z
   .object({ skuId: SkuId.optional() })
   .strict();
 
-export const WhatIfOverrides = z
+export const SkuWhatIfOverrides = z
   .object({
-    orderingCost: z.number().finite().positive().max(1_000_000_000).optional(),
-    holdingCost: z.number().finite().positive().max(1_000_000_000).optional(),
-    holdingCostUnit: HoldingCostUnit.optional(),
-    shortagePenalty: z
-      .number()
-      .finite()
-      .positive()
-      .max(1_000_000_000)
-      .optional(),
-    leadTimeDays: z.number().int().min(1).max(28).optional(),
-    targetServiceLevel: z.number().finite().gt(0).lt(1).optional(),
+    ordering_cost: z.number().finite().positive().max(1_000_000_000).optional(),
+    holding_cost_annual: z.number().finite().positive().max(1_000_000_000).optional(),
+    shortage_penalty: z.number().finite().positive().max(1_000_000_000).optional(),
+    lead_time_mean: z.number().int().min(1).max(28).optional(),
+    lead_time_std: z.number().finite().min(0).max(28).optional(),
+    service_level: z.number().finite().min(0.80).max(0.99).optional(),
+    unit_cost: z.number().finite().positive().max(1_000_000_000).optional(),
   })
   .strict()
   .refine((o) => Object.values(o).some((v) => v !== undefined), {
-    message: "Provide at least one override",
+    message: "Provide at least one override for this SKU",
+  });
+
+export const WhatIfOverrides = z
+  .record(SkuId, SkuWhatIfOverrides)
+  .refine((m) => Object.keys(m).length > 0, {
+    message: "Provide overrides for at least one SKU",
   });
 
 export const RunWhatIfInput = z.object({ overrides: WhatIfOverrides }).strict();
@@ -73,25 +78,52 @@ export const GetRiskSummaryInput = z
   })
   .strict();
 
+export const GetPortfolioPlanInput = z
+  .object({
+    skuId: SkuId.optional(),
+  })
+  .strict();
+
+export const GetModelComparisonInput = z
+  .object({
+    skuId: SkuId.optional(),
+  })
+  .strict();
+
 export const TOOL_INPUT_SCHEMAS = {
   get_sku_forecast: GetSkuForecastInput,
   get_inventory_recommendation: GetInventoryRecommendationInput,
   compare_inventory_policies: CompareInventoryPoliciesInput,
   run_what_if_scenario: RunWhatIfInput,
   get_inventory_risk_summary: GetRiskSummaryInput,
+  get_portfolio_plan: GetPortfolioPlanInput,
+  get_model_comparison: GetModelComparisonInput,
 };
 
 // ---------- tool outputs ----------
+export const SkuAssumptions = z
+  .object({
+    ordering_cost: num,
+    holding_cost_annual: num,
+    shortage_penalty: num,
+    lead_time_mean: z.number().int(),
+    lead_time_std: num,
+    service_level: num,
+    unit_cost: num,
+  })
+  .strict();
+
 export const AssumptionsView = z
   .object({
     version: z.number().int(),
-    orderingCost: num,
-    holdingCost: num,
-    holdingCostUnit: HoldingCostUnit,
-    holdingCostPerUnitPerDay: num,
-    shortagePenalty: num,
-    leadTimeDays: z.number().int(),
-    targetServiceLevel: num,
+    skuId: SkuId,
+    ordering_cost: num,
+    holding_cost_annual: num,
+    shortage_penalty: num,
+    lead_time_mean: z.number().int(),
+    lead_time_std: num,
+    service_level: num,
+    unit_cost: num,
   })
   .strict();
 
@@ -112,6 +144,11 @@ export const GetSkuForecastOutput = z
     skuId: SkuId,
     status: PySkuStatus,
     intervalStatus: PyIntervalStatus,
+    demandClass: PyDemandClass.optional().nullable(),
+    adi: num.optional().nullable(),
+    cv2: num.optional().nullable(),
+    chosenModel: z.string().optional().nullable(),
+    maseImprovement: num.optional().nullable(),
     message: z.string().nullable(),
     nObservations: z.number().int(),
     historyTail: z
@@ -195,9 +232,9 @@ export const WhatIfPolicyTotals = z
 export const RunWhatIfOutput = z
   .object({
     whatIfRunId: z.string(),
-    overrides: z.record(z.union([z.number(), z.string()])),
-    baselineAssumptions: AssumptionsView.omit({ version: true }),
-    scenarioAssumptions: AssumptionsView.omit({ version: true }),
+    overrides: z.record(SkuId, z.record(z.union([z.number(), z.string()]))),
+    baselineAssumptions: z.record(SkuId, SkuAssumptions),
+    scenarioAssumptions: z.record(SkuId, SkuAssumptions),
     baseline: z
       .object({
         deterministic: WhatIfPolicyTotals,
@@ -259,6 +296,110 @@ export const GetRiskSummaryOutput = z
   })
   .strict();
 
+export const SkuPortfolioPlanItem = z
+  .object({
+    skuId: SkuId,
+    serviceLevel: num,
+    rop: z.number().int(),
+    avgInventory: num,
+    inventoryInvestment: num,
+    totalCost: num,
+    turnover: num,
+  })
+  .strict();
+
+export const PortfolioPlanTotals = z
+  .object({
+    totalCost: num,
+    totalInventoryInvestment: num,
+    totalUnits: num,
+    avgServiceLevel: num,
+    turnover: num,
+  })
+  .strict();
+
+export const SkuPortfolioComparison = z
+  .object({
+    skuId: SkuId,
+    unconstrained: SkuPortfolioPlanItem,
+    constrained: SkuPortfolioPlanItem,
+    costDelta: num,
+    serviceLevelDelta: num,
+  })
+  .strict();
+
+export const GetPortfolioPlanOutput = z
+  .object({
+    status: z.enum(["succeeded", "not_run"]),
+    portfolioRunId: z.string().nullable().optional(),
+    budget: num.nullable().optional(),
+    capacity: num.nullable().optional(),
+    bindingConstraints: z.array(z.string()),
+    budgetShadowPrice: num.nullable().optional(),
+    totalCostDelta: num.nullable().optional(),
+    budgetUsagePct: num.nullable().optional(),
+    capacityUsagePct: num.nullable().optional(),
+    unconstrained: PortfolioPlanTotals.nullable().optional(),
+    constrained: PortfolioPlanTotals.nullable().optional(),
+    sku: SkuPortfolioComparison.nullable().optional(),
+    skus: z.array(SkuPortfolioComparison).optional(),
+    message: z.string().nullable().optional(),
+  })
+  .strict();
+
+export const ModelMetricsSummary = z
+  .object({
+    mae: num.nullable().optional(),
+    rmse: num.nullable().optional(),
+    wape: num.nullable().optional(),
+    mase: num.nullable().optional(),
+  })
+  .strict();
+
+export const SkuModelComparison = z
+  .object({
+    skuId: SkuId,
+    status: z.string(),
+    chosenModel: z.string().nullable().optional(),
+    maseImprovement: num.nullable().optional(),
+    autoets: ModelMetricsSummary.nullable().optional(),
+    seasonalNaive: ModelMetricsSummary.nullable().optional(),
+    crostonSba: ModelMetricsSummary.nullable().optional(),
+    intervalCoverage: num.nullable().optional(),
+    intervalMeanWidth: num.nullable().optional(),
+  })
+  .strict();
+
+export const ModelAggregateSummary = z
+  .object({
+    maeMean: num.nullable().optional(),
+    rmseMean: num.nullable().optional(),
+    wapePooled: num.nullable().optional(),
+    maseMean: num.nullable().optional(),
+  })
+  .strict();
+
+export const GetModelComparisonOutput = z
+  .object({
+    status: z.enum(["evaluated", "not_evaluated"]),
+    forecastRunId: z.string().nullable().optional(),
+    sku: SkuModelComparison.nullable().optional(),
+    aggregate: z
+      .object({
+        autoets: ModelAggregateSummary.nullable().optional(),
+        seasonalNaive: ModelAggregateSummary.nullable().optional(),
+        crostonSba: ModelAggregateSummary.nullable().optional(),
+        coverageMean: num.nullable().optional(),
+        meanWidthMean: num.nullable().optional(),
+      })
+      .nullable()
+      .optional(),
+    chosenModelCounts: z.record(z.string(), z.number().int()).optional(),
+    skus: z.array(SkuModelComparison).optional(),
+    message: z.string().nullable().optional(),
+  })
+  .strict();
+
 export const ToolErrorOutput = z
   .object({
     error: z.object({ code: z.string(), message: z.string() }).strict(),
@@ -287,6 +428,8 @@ export const EVIDENCE_ARTIFACT_TYPES = [
   "optimization_run",
   "simulation_run",
   "what_if_run",
+  "portfolio_run",
+  "replay_run",
 ];
 export const EvidenceId = z.string().regex(/^E\d{1,3}$/);
 

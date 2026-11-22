@@ -13,6 +13,8 @@ import "../../services/datasetHandlers.js";
 import "../../services/forecastHandlers.js";
 import "../../services/optimizationHandlers.js";
 import "../../services/simulationHandlers.js";
+import "../../services/replayHandlers.js";
+import "../../services/portfolioHandlers.js";
 
 // Import route modules
 import sessionsRouter from "./sessions.js";
@@ -22,6 +24,8 @@ import forecastRouter from "./forecast.js";
 import assumptionsRouter from "./assumptions.js";
 import optimizationRouter from "./optimization.js";
 import simulationsRouter from "./simulations.js";
+import replayRouter from "./replay.js";
+import portfolioRouter from "./portfolio.js";
 import aiRouter from "./ai.js";
 
 const router = Router();
@@ -59,6 +63,8 @@ authenticatedRouter.use(
 );
 authenticatedRouter.use("/sessions/:sessionId/optimize", optimizationRouter);
 authenticatedRouter.use("/sessions/:sessionId/simulations", simulationsRouter);
+authenticatedRouter.use("/sessions/:sessionId/replay", replayRouter);
+authenticatedRouter.use("/sessions/:sessionId/portfolio", portfolioRouter);
 authenticatedRouter.use("/ai", aiLimiter, aiRouter);
 
 router.use(authenticatedRouter);

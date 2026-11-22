@@ -133,12 +133,18 @@ router.get("/", validate({ params: IdParam }), async (req, res, next) => {
       }
     }
 
+    const skusMap =
+      assumptionDoc.skus instanceof Map
+        ? Object.fromEntries(assumptionDoc.skus)
+        : assumptionDoc.skus || {};
+
     const risk = (run.result?.skus || []).map((optSku) => {
+      const skuAssump = skusMap[optSku.sku_id];
       return computeSkuRisk({
         opt: optSku,
         evaluation: evalBySku.get(optSku.sku_id) || null,
         simulation: simBySku.get(optSku.sku_id) || null,
-        targetServiceLevel: assumptionDoc.targetServiceLevel,
+        targetServiceLevel: skuAssump?.service_level ?? 0.95,
       });
     });
 

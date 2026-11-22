@@ -7,6 +7,8 @@ export const COPY = {
     "Illustrative demonstration values. Replace them with your own costs and lead time.",
   deterministicDef:
     "Deterministic reorder point: expected lead-time demand plus a safety stock from a normal approximation (ROP = mu_L + z * sigma_L).",
+  quantileDef:
+    "Quantile reorder point: robust spread from lead-time demand forecast (sigma_est = (P90 - P10) / 2.563, SS = z * sigma_est, ROP = ceil(mean lead-time demand + SS)).",
   uncertaintyDef:
     "Uncertainty-aware reorder point: the empirical service-level quantile of simulated lead-time demand from the bootstrap paths.",
   eoqDef:

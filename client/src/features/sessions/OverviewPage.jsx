@@ -79,6 +79,13 @@ export default function OverviewPage() {
       runId: session.activeSimulationRunId,
       record: session.stages?.simulation,
     },
+    {
+      key: "portfolio",
+      title: "Portfolio Optimization & Constraints",
+      path: "portfolio",
+      runId: session.activePortfolioRunId,
+      record: session.stages?.portfolio,
+    },
   ];
 
   const aiEligible = AI_ELIGIBLE_STATUSES.includes(session.status);

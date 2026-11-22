@@ -27,6 +27,8 @@ import { getInventoryRecommendation } from "./tools/getInventoryRecommendation.j
 import { getInventoryRiskSummary } from "./tools/getInventoryRiskSummary.js";
 import { getSkuForecast } from "./tools/getSkuForecast.js";
 import { runWhatIfScenario } from "./tools/runWhatIfScenario.js";
+import { getPortfolioPlan } from "./tools/getPortfolioPlan.js";
+import { getModelComparison } from "./tools/getModelComparison.js";
 
 const MAX_TOOL_STEPS = 6;
 const MAX_TOTAL_TOOL_CALLS = 8;
@@ -56,6 +58,8 @@ export async function runAgent(input) {
     compare_inventory_policies: compareInventoryPolicies,
     run_what_if_scenario: runWhatIfScenario,
     get_inventory_risk_summary: getInventoryRiskSummary,
+    get_portfolio_plan: getPortfolioPlan,
+    get_model_comparison: getModelComparison,
   };
 
   // LangChain tool wrappers
@@ -89,6 +93,18 @@ export async function runAgent(input) {
       description:
         "Rank and summarize SKUs by stockout risk, uncertainty gap and risk flags.",
       schema: TOOL_INPUT_SCHEMAS.get_inventory_risk_summary,
+    }),
+    tool(async (args) => JSON.stringify(args), {
+      name: "get_portfolio_plan",
+      description:
+        "Get portfolio optimization plan under budget and capacity constraints, comparing unconstrained vs constrained service levels and ROPs.",
+      schema: TOOL_INPUT_SCHEMAS.get_portfolio_plan,
+    }),
+    tool(async (args) => JSON.stringify(args), {
+      name: "get_model_comparison",
+      description:
+        "Get rolling backtest evaluation metrics and chosen model comparisons across AutoETS, SeasonalNaive, and CrostonSBA.",
+      schema: TOOL_INPUT_SCHEMAS.get_model_comparison,
     }),
   ];
 

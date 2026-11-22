@@ -79,6 +79,21 @@ export function toSessionDto(doc) {
           ? d.stages.simulation.lastJobId.toString()
           : null,
       },
+      portfolio: {
+        status: d.stages?.portfolio?.status ?? "not_started",
+        startedAt: d.stages?.portfolio?.startedAt
+          ? d.stages.portfolio.startedAt.toISOString()
+          : null,
+        finishedAt: d.stages?.portfolio?.finishedAt
+          ? d.stages.portfolio.finishedAt.toISOString()
+          : null,
+        errorCode: d.stages?.portfolio?.errorCode ?? null,
+        userMessage: d.stages?.portfolio?.userMessage ?? null,
+        retryable: d.stages?.portfolio?.retryable ?? false,
+        lastJobId: d.stages?.portfolio?.lastJobId
+          ? d.stages.portfolio.lastJobId.toString()
+          : null,
+      },
     },
     activeDatasetId: d.activeDatasetId ? d.activeDatasetId.toString() : null,
     activeForecastRunId: d.activeForecastRunId
@@ -93,6 +108,11 @@ export function toSessionDto(doc) {
     activeSimulationRunId: d.activeSimulationRunId
       ? d.activeSimulationRunId.toString()
       : null,
+    activePortfolioRunId: d.activePortfolioRunId
+      ? d.activePortfolioRunId.toString()
+      : null,
+    budget: d.budget ?? null,
+    capacity: d.capacity ?? null,
     aiIndex: {
       status: d.aiIndex?.status ?? "not_indexed",
       updatedAt: d.aiIndex?.updatedAt

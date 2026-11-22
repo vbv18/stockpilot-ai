@@ -485,7 +485,7 @@ retrieved text as untrusted data, not instructions.
 - Application API: Node.js + JavaScript + Express.
 - Authentication: Firebase Authentication.
 - Primary database: MongoDB.
-- Cache: Redis optional; not a hard dependency for initial delivery.
+- Background jobs: In-process MongoDB-backed job queue with concurrency control.
 - Statistical service: Python 3.11 + FastAPI.
 - Forecasting: StatsForecast (`AutoETS`, `SeasonalNaive`),
   NumPy/Pandas as needed.
@@ -521,8 +521,7 @@ initial design.
 **Qdrant** - Embedding index for selected textual session artifacts. -
 Never authoritative for exact numerical values or ownership.
 
-**Redis** - Optional caching and short-lived job coordination; no queue
-dependency required for the prototype.
+**Job Queue** - In-process MongoDB-backed job runner (`server/src/services/jobRunner.js`) managing asynchronous tasks, concurrency control, deduplication, and cancellation without external queue dependencies.
 
 ### 9.3 Architecture principles
 

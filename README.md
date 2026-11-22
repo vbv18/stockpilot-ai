@@ -17,7 +17,7 @@ StockPilot AI combines deterministic statistical algorithms with modern agentic 
                             ▼
 ┌────────────────────────────────────────────────────────┐
 │                  Node.js / Express API                 │
-│      (Auth, BullMQ Jobs, Mongo ODM, Rate Limits)       │
+│    (Auth, Mongo Job Queue, Mongo ODM, Rate Limits)     │
 └────────────┬─────────────────────────────┬─────────────┘
              │ HTTP (X-Service-Key)        │ Vector Search / RAG
              ▼                             ▼
@@ -29,8 +29,8 @@ StockPilot AI combines deterministic statistical algorithms with modern agentic 
 ```
 
 - **Frontend (`client/`)**: Modern React 19 application built with Vite, Tailwind CSS, Lucide icons, and Recharts. Connects to backend with authenticated Axios and RTK Query hooks.
-- **API Server (`server/`)**: Express.js server providing authentication verification (Firebase Admin), multi-tenant isolation, BullMQ job queuing, rate limiting, and LangGraph agent orchestration.
-- **Stats Service (`stats-service/`)**: Dedicated Python 3.11+ FastAPI service implementing statistical demand forecasting (AutoARIMA, ETS, Croston/SBA, Seasonal Naive, Linear Regression) and Monte Carlo bootstrap discrete-event simulations.
+- **API Server (`server/`)**: Express.js server providing authentication verification (Firebase Admin), multi-tenant isolation, in-process MongoDB-backed job queue (`server/src/services/jobRunner.js`) with concurrency control, deduplication, and cancellation, rate limiting, and LangGraph agent orchestration.
+- **Stats Service (`stats-service/`)**: Dedicated Python 3.11+ FastAPI service implementing statistical demand forecasting (ETS, Croston/SBA, Seasonal Naive) and Monte Carlo bootstrap discrete-event simulations.
 - **Vector Search (`Qdrant`)**: Vector database hosting chunked session artifacts, forecasting summaries, and policy documents for grounded semantic retrieval by the Ask AI assistant.
 
 ---
@@ -42,7 +42,6 @@ StockPilot AI combines deterministic statistical algorithms with modern agentic 
 - Node.js 20+
 - Python 3.11+
 - MongoDB 6+
-- Redis 7+ (or Upstash Redis)
 - Firebase Project (for Authentication)
 - Qdrant Cluster (optional, for Ask AI vector search)
 
@@ -87,7 +86,6 @@ npm run dev
 | `NODE_ENV`                      | Application environment                                | `development`                              |
 | `CLIENT_ORIGIN`                 | Allowed CORS origin                                    | `http://localhost:5173`                    |
 | `MONGO_URI`                     | MongoDB connection string                              | `mongodb://localhost:27017/stockpilot`     |
-| `REDIS_URL`                     | Redis connection URI                                   | `redis://localhost:6379`                   |
 | `STORAGE_DRIVER`                | File storage driver (`local` or `s3`)                  | `local`                                    |
 | `LOCAL_STORAGE_DIR`             | Directory for local file storage                       | `./storage`                                |
 | `STATS_SERVICE_URL`             | Python stats service URL                               | `http://127.0.0.1:8000`                    |
@@ -134,7 +132,7 @@ If using the open UCI Online Retail dataset:
 ## 5. Methodological Summary
 
 - **Demand Intermittency**: Syntetos-Boylan classification ($ADI$ and $CV^2$) to categorize items into Smooth, Intermittent, Erratic, or Lumpy demand streams.
-- **Forecasting**: Backtested model evaluation across AutoARIMA, ETS, Croston/SBA, Seasonal Naive, and Linear Regression with calendar regressors, selecting the optimal model per SKU based on WAPE/RMSE.
+- **Forecasting**: Backtested model evaluation across candidate models (ETS, Croston/SBA, Seasonal Naive), selecting the optimal model per SKU based on WAPE/RMSE.
 - **Policy Optimization**:
   - Economic Order Quantity ($Q^*$): Balancing ordering costs and holding costs.
   - Lead-Time Demand Parameters ($\mu_L$, $\sigma_L$): Incorporating stochastic demand and lead-time variability.

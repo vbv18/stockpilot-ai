@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import {
   BrowserRouter,
   Routes,
@@ -17,13 +18,30 @@ import SessionLayout from "./features/sessions/SessionLayout.jsx";
 import OverviewPage from "./features/sessions/OverviewPage.jsx";
 import UploadPage from "./features/dataset/UploadPage.jsx";
 import ValidationPage from "./features/dataset/ValidationPage.jsx";
-import ForecastPage from "./features/forecast/ForecastPage.jsx";
 import AssumptionsPage from "./features/assumptions/AssumptionsPage.jsx";
-import OptimizationPage from "./features/optimization/OptimizationPage.jsx";
-import SimulationPage from "./features/simulation/SimulationPage.jsx";
-import AskAiPage from "./features/ai/AskAiPage.jsx";
+
+const ForecastPage = lazy(() => import("./features/forecast/ForecastPage.jsx"));
+const OptimizationPage = lazy(() =>
+  import("./features/optimization/OptimizationPage.jsx")
+);
+const SimulationPage = lazy(() =>
+  import("./features/simulation/SimulationPage.jsx")
+);
+const PortfolioPage = lazy(() =>
+  import("./features/portfolio/PortfolioPage.jsx")
+);
+const AskAiPage = lazy(() => import("./features/ai/AskAiPage.jsx"));
+
 import { useGetSessionQuery } from "./lib/api.js";
 import { currentStep } from "./features/sessions/steps.js";
+
+function PageLoader() {
+  return (
+    <div className="flex h-64 items-center justify-center text-slate-400">
+      <div className="text-sm">Loading...</div>
+    </div>
+  );
+}
 
 function SessionIndexRedirect() {
   const { sessionId } = useParams();
@@ -73,22 +91,63 @@ export default function App() {
             <Route path="overview" element={<OverviewPage />} />
             <Route path="upload" element={<UploadPage />} />
             <Route path="validation" element={<ValidationPage />} />
-            <Route path="forecast" element={<ForecastPage />} />
+            <Route
+              path="forecast"
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <ForecastPage />
+                </Suspense>
+              }
+            />
             <Route path="assumptions" element={<AssumptionsPage />} />
-            <Route path="optimization" element={<OptimizationPage />} />
-            <Route path="simulation" element={<SimulationPage />} />
+            <Route
+              path="optimization"
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <OptimizationPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="simulation"
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <SimulationPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="portfolio"
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <PortfolioPage />
+                </Suspense>
+              }
+            />
           </Route>
 
           <Route
             path="/ask-ai"
             element={
-              userData ? <AskAiPage /> : <Navigate to="/login" replace />
+              userData ? (
+                <Suspense fallback={<PageLoader />}>
+                  <AskAiPage />
+                </Suspense>
+              ) : (
+                <Navigate to="/login" replace />
+              )
             }
           />
           <Route
             path="/ask-ai/:conversationId"
             element={
-              userData ? <AskAiPage /> : <Navigate to="/login" replace />
+              userData ? (
+                <Suspense fallback={<PageLoader />}>
+                  <AskAiPage />
+                </Suspense>
+              ) : (
+                <Navigate to="/login" replace />
+              )
             }
           />
 

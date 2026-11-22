@@ -10,6 +10,13 @@ from statsforecast.models import AutoETS, SeasonalNaive
 
 from ..schemas import ForecastParams, IntervalBand, SkuForecast
 from .bootstrap import block_cutoffs, generate_paths
+from .classification import classify_demand
+from .evaluation import evaluate_sku_rolling
+from .intermittent import (
+    collect_residual_blocks_croston,
+    fit_predict_croston,
+    simulate_intermittent_intervals,
+)
 from .seeds import derive_seed
 
 log = logging.getLogger("stats.forecast")
@@ -22,6 +29,11 @@ class SkuFit:
     interval_status: str
     message: Optional[str]
     n_observations: int
+    demand_class: str = "smooth"
+    adi: float = 1.0
+    cv2: float = 0.0
+    chosen_model: Optional[str] = None
+    mase_improvement: Optional[float] = None
     autoets_mean: Optional[np.ndarray] = None
     seasonal_naive_mean: Optional[np.ndarray] = None
     p10: Optional[np.ndarray] = None
@@ -74,49 +86,146 @@ def collect_residual_blocks(y: np.ndarray, params: ForecastParams):
     return blocks, used, failed
 
 
-def fit_sku(sku_id: str, y: np.ndarray, params: ForecastParams) -> SkuFit:
+def fit_intermittent_sku(
+    sku_id: str,
+    y: np.ndarray,
+    params: ForecastParams,
+    demand_class: str,
+    adi: float,
+    cv2: float,
+) -> SkuFit:
     n = int(len(y))
-    if n < params.min_history:
-        return SkuFit(sku_id, "insufficient_history", "not_computed",
-                      f"Needs at least {params.min_history} days of history; got {n}.", n)
-    if float(np.sum(y)) <= 0.0:
-        return SkuFit(sku_id, "no_demand", "not_computed", "All observed demand is zero.", n)
-
     try:
-        ets_mean, ets_model = fit_predict(AutoETS, y, params.horizon, params.season_length)
+        croston_mean, _ = fit_predict_croston(y, params.horizon)
         sn_mean, _ = fit_predict(SeasonalNaive, y, params.horizon, params.season_length)
     except Exception as exc:
-        log.warning("model fit failed for %s: %s", sku_id, type(exc).__name__)
-        return SkuFit(sku_id, "model_failed", "not_computed", f"Model fitting failed ({type(exc).__name__}).", n)
+        log.warning("croston model fit failed for %s: %s", sku_id, type(exc).__name__)
+        return SkuFit(
+            sku_id, "model_failed", "not_computed", f"Model fitting failed ({type(exc).__name__}).", n,
+            demand_class=demand_class, adi=adi, cv2=cv2,
+        )
 
-    fit = SkuFit(sku_id, "ok", "not_computed", None, n,
-                 autoets_mean=ets_mean, seasonal_naive_mean=sn_mean, model_spec=_model_spec(ets_model))
+    p10, p50, p90, _ = simulate_intermittent_intervals(sku_id, y, params.horizon, n_sim=500, history_days=90)
 
-    if float(np.mean(np.asarray(y) == 0.0)) > 0.5:
-        fit.warnings.append("More than half of observed days have zero demand; intervals and normal approximations may be unreliable.")
+    fit = SkuFit(
+        sku_id=sku_id,
+        status="ok",
+        interval_status="ok",
+        message=None,
+        n_observations=n,
+        demand_class=demand_class,
+        adi=adi,
+        cv2=cv2,
+        autoets_mean=croston_mean,
+        seasonal_naive_mean=sn_mean,
+        p10=p10,
+        p50=p50,
+        p90=p90,
+        model_spec="CrostonSBA",
+        warnings=[f"Demand classified as {demand_class} (ADI={adi:.2f}, CV²={cv2:.2f}); using Croston SBA point forecast and non-parametric simulation."],
+    )
 
-    blocks_list, used, failed = collect_residual_blocks(y, params)
+    blocks_list, used, failed = collect_residual_blocks_croston(y, params)
     fit.n_failed_origins = failed
     if failed:
         fit.warnings.append(f"{failed} rolling-origin fit(s) failed and were skipped.")
 
-    if len(blocks_list) < params.min_residual_blocks:
-        fit.interval_status = "insufficient_residuals"
+    if len(blocks_list) >= params.min_residual_blocks:
+        blocks = np.vstack(blocks_list)
+        fit.residual_blocks = blocks
+        fit.residual_cutoffs = used
+        fit.residual_std = float(np.std(blocks.ravel(), ddof=1))
+    else:
         fit.warnings.append(
-            f"Only {len(blocks_list)} residual block(s) available; at least {params.min_residual_blocks} are required. "
-            "Prediction intervals were not computed."
+            f"Only {len(blocks_list)} residual block(s) available; at least {params.min_residual_blocks} are required for downstream optimization."
         )
-        return fit
 
-    blocks = np.vstack(blocks_list)
+    return fit
+
+
+def fit_sku(sku_id: str, y: np.ndarray, params: ForecastParams) -> SkuFit:
+    n = int(len(y))
+    demand_class, adi, cv2 = classify_demand(y)
+    if n < params.min_history:
+        return SkuFit(
+            sku_id, "insufficient_history", "not_computed",
+            f"Needs at least {params.min_history} days of history; got {n}.", n,
+            demand_class=demand_class, adi=adi, cv2=cv2,
+        )
+    if float(np.sum(y)) <= 0.0:
+        return SkuFit(
+            sku_id, "no_demand", "not_computed", "All observed demand is zero.", n,
+            demand_class=demand_class, adi=adi, cv2=cv2,
+        )
+
+    eval_result = evaluate_sku_rolling(sku_id, y, params, demand_class)
+    if eval_result is None:
+        return SkuFit(
+            sku_id, "insufficient_history", "not_computed",
+            f"Needs at least {params.min_history + 8 * params.origin_step} days of history for 8-origin rolling evaluation; got {n}.", n,
+            demand_class=demand_class, adi=adi, cv2=cv2,
+        )
+
+    chosen_model = eval_result.chosen_model
+    mase_improvement = eval_result.mase_improvement
+    chosen_blocks = eval_result.residual_blocks
     rng = np.random.default_rng(derive_seed(params.seed, sku_id, "bootstrap"))
-    paths = generate_paths(ets_mean, blocks, params.n_bootstrap, params.horizon, params.block_size, rng)
-    p10, p50, p90 = np.percentile(paths, [10, 50, 90], axis=0)
-    fit.interval_status = "ok"
-    fit.p10, fit.p50, fit.p90 = p10, p50, p90
-    fit.residual_blocks = blocks
-    fit.residual_cutoffs = used
-    fit.residual_std = float(np.std(blocks.ravel(), ddof=1))
+
+    # Fit chosen model on the full historical series
+    try:
+        if chosen_model == "AutoETS":
+            fc_mean, model_obj = fit_predict(AutoETS, y, params.horizon, params.season_length)
+            model_spec = _model_spec(model_obj) or "AutoETS"
+            paths = generate_paths(fc_mean, chosen_blocks, params.n_bootstrap, params.horizon, params.block_size, rng)
+            p10, p50, p90 = np.percentile(paths, [10, 50, 90], axis=0)
+        elif chosen_model == "SeasonalNaive":
+            fc_mean, _ = fit_predict(SeasonalNaive, y, params.horizon, params.season_length)
+            model_spec = "SeasonalNaive"
+            paths = generate_paths(fc_mean, chosen_blocks, params.n_bootstrap, params.horizon, params.block_size, rng)
+            p10, p50, p90 = np.percentile(paths, [10, 50, 90], axis=0)
+        else:  # CrostonSBA
+            fc_mean, _ = fit_predict_croston(y, params.horizon)
+            model_spec = "CrostonSBA"
+            p10, p50, p90, _ = simulate_intermittent_intervals(sku_id, y, params.horizon, n_sim=500, history_days=90)
+    except Exception as exc:
+        log.warning("model fit failed for %s with chosen model %s: %s", sku_id, chosen_model, type(exc).__name__)
+        return SkuFit(
+            sku_id, "model_failed", "not_computed", f"Model fitting failed ({type(exc).__name__}).", n,
+            demand_class=demand_class, adi=adi, cv2=cv2, chosen_model=chosen_model, mase_improvement=mase_improvement,
+        )
+
+    # Seasonal naive baseline for comparison
+    try:
+        sn_mean, _ = fit_predict(SeasonalNaive, y, params.horizon, params.season_length)
+    except Exception:
+        sn_mean = fc_mean
+
+    fit = SkuFit(
+        sku_id=sku_id,
+        status="ok",
+        interval_status="ok",
+        message=None,
+        n_observations=n,
+        demand_class=demand_class,
+        adi=adi,
+        cv2=cv2,
+        chosen_model=chosen_model,
+        mase_improvement=mase_improvement,
+        autoets_mean=fc_mean,
+        seasonal_naive_mean=sn_mean,
+        p10=p10,
+        p50=p50,
+        p90=p90,
+        residual_blocks=chosen_blocks,
+        residual_cutoffs=eval_result.residual_cutoffs,
+        residual_std=float(np.std(chosen_blocks.ravel(), ddof=1)),
+        n_failed_origins=eval_result.failed_origins,
+        model_spec=model_spec,
+        warnings=[
+            f"Model chosen by lowest rolling MASE: {chosen_model} ({mase_improvement:+.1f}% vs SeasonalNaive).",
+            f"Demand classified as {demand_class} (ADI={adi:.2f}, CV²={cv2:.2f}).",
+        ],
+    )
     return fit
 
 
@@ -129,15 +238,20 @@ def to_sku_forecast(fit: SkuFit, start_date: date, n_obs: int) -> SkuForecast:
         sku_id=fit.sku_id,
         status=fit.status,
         interval_status=fit.interval_status,
+        demand_class=fit.demand_class,
+        adi=fit.adi,
+        cv2=fit.cv2,
+        chosen_model=fit.chosen_model,
+        mase_improvement=fit.mase_improvement,
         message=fit.message,
         n_observations=n_obs,
         forecast_start_date=(start_date + timedelta(days=n_obs)) if ok else None,
         autoets_mean=fit.autoets_mean.tolist() if ok else None,
         seasonal_naive_mean=fit.seasonal_naive_mean.tolist() if ok else None,
         intervals=intervals,
-        residual_blocks=fit.residual_blocks.tolist() if intervals is not None else None,
-        residual_block_cutoffs=list(fit.residual_cutoffs) if intervals is not None else None,
-        residual_std=fit.residual_std if intervals is not None else None,
+        residual_blocks=fit.residual_blocks.tolist() if intervals is not None and fit.residual_blocks is not None else None,
+        residual_block_cutoffs=list(fit.residual_cutoffs) if intervals is not None and fit.residual_cutoffs is not None else None,
+        residual_std=fit.residual_std if intervals is not None and fit.residual_blocks is not None else None,
         n_residual_blocks=int(fit.residual_blocks.shape[0]) if fit.residual_blocks is not None else len(fit.residual_cutoffs),
         n_failed_origins=fit.n_failed_origins,
         autoets_model_spec=fit.model_spec if ok else None,

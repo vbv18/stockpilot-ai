@@ -50,6 +50,7 @@ export const STAGE_NAMES = [
   "forecast",
   "optimization",
   "simulation",
+  "portfolio",
 ];
 export const StageName = z.enum(STAGE_NAMES);
 export const StageStatus = z.enum([
@@ -66,6 +67,8 @@ export const JOB_STAGES = [
   "forecast",
   "optimization",
   "simulation",
+  "replay",
+  "portfolio",
 ];
 export const JobStage = z.enum(JOB_STAGES);
 export const JobStatus = z.enum([

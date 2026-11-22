@@ -5,6 +5,8 @@ import { ForecastRunModel } from "../../models/forecastRun.model.js";
 import { AssumptionSetModel } from "../../models/assumptionSet.model.js";
 import { OptimizationRunModel } from "../../models/optimizationRun.model.js";
 import { SimulationRunModel } from "../../models/simulationRun.model.js";
+import { PortfolioRunModel } from "../../models/portfolioRun.model.js";
+import { ReplayRunModel } from "../../models/replayRun.model.js";
 import { loadProcessedSeries } from "../processedSeries.js";
 
 /**
@@ -19,6 +21,8 @@ import { loadProcessedSeries } from "../processedSeries.js";
  *   assumptions: any | null,
  *   optimizationRun: any | null,
  *   simulationRun: any | null,
+ *   portfolioRun: any | null,
+ *   replayRun: any | null,
  *   history: any[] | null
  * }>}
  */
@@ -70,6 +74,24 @@ export async function loadSessionBundle(userId, sessionId) {
       })
     : null;
 
+  // Active succeeded portfolio run
+  const portfolioRun = session.activePortfolioRunId
+    ? await PortfolioRunModel.findOne({
+        _id: session.activePortfolioRunId,
+        userId,
+        status: "succeeded",
+      })
+    : null;
+
+  // Active succeeded replay run
+  const replayRun = session.activeReplayRunId
+    ? await ReplayRunModel.findOne({
+        _id: session.activeReplayRunId,
+        userId,
+        status: "succeeded",
+      })
+    : null;
+
   // Load processed series history if dataset status is ready
   let history = null;
   if (dataset && dataset.status === "ready") {
@@ -87,6 +109,8 @@ export async function loadSessionBundle(userId, sessionId) {
     assumptions,
     optimizationRun,
     simulationRun,
+    portfolioRun,
+    replayRun,
     history,
   };
 }
