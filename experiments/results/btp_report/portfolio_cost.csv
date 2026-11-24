@@ -1,0 +1,7 @@
+sku_id,unconstrained_service_level,constrained_service_level,unconstrained_rop,constrained_rop,unconstrained_avg_inventory,constrained_avg_inventory,unconstrained_inventory_investment,constrained_inventory_investment,unconstrained_total_cost,constrained_total_cost,cost_delta,unconstrained_turnover,constrained_turnover,budget,capacity,budget_shadow_price,binding_constraints
+21755,0.98,0.96,24,17,50.48,44.33,2044.3,1795.53,549.38,961.82,412.44,9.3064,10.5959,13206.29,,,
+22749,0.98,0.98,80,80,107.99,107.99,2764.57,2764.57,1919.1,1919.1,0.0,14.4633,14.4633,13206.29,,,
+71053,0.98,0.96,74,65,84.15,75.85,2936.83,2647.32,1204.43,1766.52,562.09,10.3982,11.5354,13206.29,,,
+48187,0.98,0.8,50,29,75.5,56.06,3556.01,2640.59,557.83,1310.58,752.75,11.5729,15.585,13206.29,,,
+21871,0.98,0.88,77,58,90.3,70.77,4235.11,3318.97,561.9,1253.67,691.77,12.8929,16.4517,13206.29,,,
+PORTFOLIO_TOTAL,0.98,0.916,305,249,408.42,355.01,15536.82,13166.97,4792.64,7211.69,2419.05,12.1069,13.9282,13206.29,,-2.1281,budget

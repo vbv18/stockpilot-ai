@@ -31,13 +31,15 @@ export function getChatModel() {
       env.LLM_PROVIDER === "groq"
         ? { baseURL: "https://api.groq.com/openai/v1" }
         : undefined;
+    const effectiveMaxTokens =
+      env.LLM_PROVIDER === "groq" ? Math.min(maxTokens, 1536) : maxTokens;
     return new ChatOpenAI({
       model:
         env.LLM_MODEL ||
         (env.LLM_PROVIDER === "groq" ? "llama-3.3-70b-versatile" : "gpt-4o"),
       apiKey: env.LLM_API_KEY,
       temperature,
-      maxTokens,
+      maxTokens: effectiveMaxTokens,
       configuration,
     });
   }

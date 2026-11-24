@@ -51,8 +51,7 @@ router.post(
         );
       }
 
-      const budget =
-        body.budget !== undefined ? body.budget : session.budget;
+      const budget = body.budget !== undefined ? body.budget : session.budget;
       const capacity =
         body.capacity !== undefined ? body.capacity : session.capacity;
 

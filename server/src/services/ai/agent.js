@@ -29,6 +29,7 @@ import { getSkuForecast } from "./tools/getSkuForecast.js";
 import { runWhatIfScenario } from "./tools/runWhatIfScenario.js";
 import { getPortfolioPlan } from "./tools/getPortfolioPlan.js";
 import { getModelComparison } from "./tools/getModelComparison.js";
+import { getDependencyPairs } from "./tools/getDependencyPairs.js";
 
 const MAX_TOOL_STEPS = 6;
 const MAX_TOTAL_TOOL_CALLS = 8;
@@ -60,6 +61,7 @@ export async function runAgent(input) {
     get_inventory_risk_summary: getInventoryRiskSummary,
     get_portfolio_plan: getPortfolioPlan,
     get_model_comparison: getModelComparison,
+    get_dependency_pairs: getDependencyPairs,
   };
 
   // LangChain tool wrappers
@@ -85,7 +87,7 @@ export async function runAgent(input) {
     tool(async (args) => JSON.stringify(args), {
       name: "run_what_if_scenario",
       description:
-        "Simulate a what-if inventory scenario under overridden cost, lead time, or service level assumptions.",
+        "Simulate a what-if inventory scenario under overridden cost, lead time, or service level assumptions across all three policies.",
       schema: TOOL_INPUT_SCHEMAS.run_what_if_scenario,
     }),
     tool(async (args) => JSON.stringify(args), {
@@ -103,8 +105,14 @@ export async function runAgent(input) {
     tool(async (args) => JSON.stringify(args), {
       name: "get_model_comparison",
       description:
-        "Get rolling backtest evaluation metrics and chosen model comparisons across AutoETS, SeasonalNaive, and CrostonSBA.",
+        "Get rolling backtest evaluation metrics and chosen model comparisons across AutoETS, SeasonalNaive, CrostonSBA, Naive, and Global LGBM.",
       schema: TOOL_INPUT_SCHEMAS.get_model_comparison,
+    }),
+    tool(async (args) => JSON.stringify(args), {
+      name: "get_dependency_pairs",
+      description:
+        "Get demand co-movement / correlation pairs (|rho| >= 0.3) and risk pooling ratio from multi-SKU dependency analysis.",
+      schema: TOOL_INPUT_SCHEMAS.get_dependency_pairs,
     }),
   ];
 
@@ -162,16 +170,16 @@ export async function runAgent(input) {
         userId,
         sessionId,
         query: question,
-        limit: 8,
+        limit: 1,
       });
       searchHits.push(...mainHits);
 
-      for (const skuId of mentionedSkus.slice(0, 3)) {
+      for (const skuId of mentionedSkus.slice(0, 1)) {
         const skuHits = await searchSession({
           userId,
           sessionId,
           query: question,
-          limit: 4,
+          limit: 1,
           skuId,
         });
         searchHits.push(...skuHits);
@@ -209,7 +217,7 @@ export async function runAgent(input) {
         });
 
         retrievedEvidenceBlocks.push(
-          `RETRIEVED EVIDENCE (evidence ${entry.evidenceId}):\n<untrusted_data>\n${hit.text}\ncanonical: ${JSON.stringify(canonical.payload)}\n</untrusted_data>`,
+          `RETRIEVED EVIDENCE (evidence ${entry.evidenceId}):\n<untrusted_data>\n${hit.text}\n</untrusted_data>`,
         );
       }
     }
@@ -245,6 +253,33 @@ export async function runAgent(input) {
     };
   }
 
+  async function invokeWithRateLimitRetry(invoker, maxRetries = 3) {
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await invoker();
+      } catch (err) {
+        const msg = err.message || "";
+        const isRateLimit =
+          err.status === 429 ||
+          msg.includes("rate_limit") ||
+          msg.includes("429") ||
+          err.code === "rate_limit_exceeded";
+        if (isRateLimit && attempt < maxRetries && !signal?.aborted) {
+          const match = msg.match(/try again in ([0-9.]+)s/i);
+          const waitMs = match
+            ? Math.min(Math.ceil(parseFloat(match[1]) * 1000) + 1500, 35000)
+            : 12000;
+          console.warn(
+            `LLM rate limited, waiting ${waitMs}ms before retry (attempt ${attempt + 1}/${maxRetries})...`,
+          );
+          await new Promise((r) => setTimeout(r, waitMs));
+          continue;
+        }
+        throw err;
+      }
+    }
+  }
+
   // 2. Agent Node
   async function agentNode(state) {
     if (signal?.aborted)
@@ -252,7 +287,9 @@ export async function runAgent(input) {
 
     const llm = getChatModel();
     const modelWithTools = llm.bindTools(toolDefs);
-    const aiMessage = await modelWithTools.invoke(state.messages);
+    const aiMessage = await invokeWithRateLimitRetry(() =>
+      modelWithTools.invoke(state.messages),
+    );
 
     return {
       messages: [aiMessage],
@@ -433,6 +470,46 @@ export async function runAgent(input) {
   let parsedDraft = null;
   let composeAttempts = 0;
 
+  function normalizeDraft(draft) {
+    if (!draft || typeof draft !== "object") return draft;
+    const d = { ...draft };
+    if (!d.schemaVersion) d.schemaVersion = "1.0";
+    if (!d.intent) d.intent = "decision_support";
+    if (typeof d.warnings === "string") d.warnings = d.warnings ? [d.warnings] : [];
+    else if (!Array.isArray(d.warnings)) d.warnings = [];
+    if (!Array.isArray(d.followUpSuggestions)) d.followUpSuggestions = [];
+
+    if (Array.isArray(d.keyFindings)) {
+      d.keyFindings = d.keyFindings.map((f) => {
+        if (!f || typeof f !== "object") return f;
+        return {
+          label: f.label || f.metric || f.name || "Finding",
+          value: f.value ?? null,
+          unit: f.unit || "none",
+          skuId: f.skuId || null,
+          evidenceId: f.evidenceId || "E0",
+          provenance: f.provenance || "calculated",
+        };
+      });
+    } else {
+      d.keyFindings = [];
+    }
+
+    if (Array.isArray(d.evidence)) {
+      d.evidence = d.evidence.map((e) => {
+        if (!e || typeof e !== "object") return e;
+        return {
+          evidenceId: e.evidenceId || "E0",
+          metricKeys: Array.isArray(e.metricKeys) ? e.metricKeys : [],
+          note: e.note || null,
+        };
+      });
+    } else {
+      d.evidence = [];
+    }
+    return d;
+  }
+
   async function composeNode(state) {
     if (signal?.aborted)
       throw new AppError("JOB_CANCELLED", "The operation was cancelled.");
@@ -445,7 +522,7 @@ export async function runAgent(input) {
     );
 
     const evidenceListLines = ledger.all().map((e) => {
-      const firstKeys = (e.keys || []).slice(0, 25).join(", ");
+      const firstKeys = (e.keys || []).slice(0, 8).join(", ");
       return `${e.evidenceId} | ${e.artifactType} | sku=${e.skuId || "none"} | ${e.label} | keys: ${firstKeys}`;
     });
 
@@ -457,7 +534,7 @@ export async function runAgent(input) {
 
     for (let attempt = 1; attempt <= 3; attempt++) {
       composeAttempts = attempt;
-      const res = await llm.invoke(messages);
+      const res = await invokeWithRateLimitRetry(() => llm.invoke(messages));
       const rawText = res.content
         ? typeof res.content === "string"
           ? res.content
@@ -471,8 +548,22 @@ export async function runAgent(input) {
         .trim();
 
       try {
-        const parsed = JSON.parse(cleanJson);
-        const validated = AssistantDraft.safeParse(parsed);
+        const jsonMatch = cleanJson.match(/\{[\s\S]*/);
+        const jsonToParse = jsonMatch ? jsonMatch[0] : cleanJson;
+        let parsed;
+        try {
+          parsed = JSON.parse(jsonToParse);
+        } catch {
+          // Attempt repair for truncated trailing array/braces
+          let repaired = jsonToParse.trim();
+          if (!repaired.endsWith("}")) {
+            if (repaired.endsWith(",")) repaired = repaired.slice(0, -1);
+            if (!repaired.endsWith("]") && repaired.includes("[")) repaired += "]";
+            repaired += "}";
+          }
+          parsed = JSON.parse(repaired);
+        }
+        const validated = AssistantDraft.safeParse(normalizeDraft(parsed));
         if (validated.success) {
           parsedDraft = validated.data;
           return { messages: [res] };
@@ -494,8 +585,13 @@ export async function runAgent(input) {
             );
           }
         }
-      } catch {
-        console.warn("Draft JSON unparseable", { attempt });
+      } catch (err) {
+        console.warn("Draft JSON unparseable", {
+          attempt,
+          err: err.message,
+          rawPreview: rawText.slice(0, 300),
+          rawLength: rawText.length,
+        });
         if (attempt < 3) {
           messages.push(res);
           messages.push(
@@ -557,7 +653,7 @@ export async function runAgent(input) {
     .addEdge(START, "prepare")
     .addEdge("prepare", "agent")
     .addConditionalEdges("agent", shouldContinue, ["tools", "compose"])
-    .addEdge("tools", "agent")
+    .addEdge("tools", "compose")
     .addEdge("compose", "verify")
     .addEdge("verify", END);
 

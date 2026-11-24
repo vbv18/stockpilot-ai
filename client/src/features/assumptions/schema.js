@@ -1,15 +1,20 @@
 import { z } from "zod";
 
 export const skuAssumptionRowSchema = z.object({
-  ordering_cost: z
+  sku_id: z.string().min(1, "SKU ID is required"),
+  unit_cost: z
     .number({ invalid_type_error: "Enter a number" })
     .positive("Must be greater than 0")
     .max(1_000_000_000),
-  holding_cost_annual: z
+  order_cost: z
     .number({ invalid_type_error: "Enter a number" })
     .positive("Must be greater than 0")
     .max(1_000_000_000),
-  shortage_penalty: z
+  holding_rate: z
+    .number({ invalid_type_error: "Enter a number" })
+    .positive("Must be greater than 0")
+    .max(1_000_000_000),
+  shortage_cost: z
     .number({ invalid_type_error: "Enter a number" })
     .positive("Must be greater than 0")
     .max(1_000_000_000),
@@ -23,20 +28,31 @@ export const skuAssumptionRowSchema = z.object({
     .min(0, "Cannot be negative")
     .max(28, "At most 28 days")
     .default(0),
-  service_level: z
+  target_service_level: z
     .number({ invalid_type_error: "Enter a number" })
     .min(0.8, "At least 0.80 (80%)")
     .max(0.99, "At most 0.99 (99%)"),
-  unit_cost: z
-    .number({ invalid_type_error: "Enter a number" })
-    .positive("Must be greater than 0")
-    .max(1_000_000_000),
+  moq: z
+    .number({ invalid_type_error: "Enter a whole number" })
+    .int("Must be a whole number")
+    .min(1, "At least 1")
+    .default(1),
+  pack_size: z
+    .number({ invalid_type_error: "Enter a whole number" })
+    .int("Must be a whole number")
+    .min(1, "At least 1")
+    .default(1),
+  initial_stock: z
+    .number({ invalid_type_error: "Enter a whole number" })
+    .int("Must be a whole number")
+    .min(0, "Cannot be negative")
+    .default(0),
 });
 
-export const assumptionsFormSchema = z.record(
-  z.string().min(1),
-  skuAssumptionRowSchema,
-);
+export const assumptionsFormSchema = z.union([
+  z.array(skuAssumptionRowSchema),
+  z.record(z.string().min(1), skuAssumptionRowSchema),
+]);
 
 export const sessionConstraintsSchema = z.object({
   budget: z

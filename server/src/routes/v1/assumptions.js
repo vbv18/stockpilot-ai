@@ -32,6 +32,7 @@ function toAssumptionSetDto(doc) {
     id: d._id ? d._id.toString() : d.id,
     version: d.version,
     skus: skusObj,
+    skusList: Object.values(skusObj),
     provenance: d.provenance || {},
     budget: d.budget ?? null,
     capacity: d.capacity ?? null,
@@ -59,7 +60,10 @@ router.get(
           _id: session.activeDatasetId,
           userId: user.userId,
         });
-        skuIds = dataset?.validationSummary?.skuIds || [];
+        skuIds =
+          dataset?.transformationConfig?.skuIds ||
+          dataset?.validationSummary?.skuIds ||
+          [];
       }
       if (skuIds.length === 0 && session.activeForecastRunId) {
         const forecastRun = await ForecastRunModel.findOne({
@@ -72,24 +76,31 @@ router.get(
       }
 
       const defaultSkuValues = {
-        ordering_cost: DEMO_ASSUMPTION_DEFAULTS.ordering_cost,
-        holding_cost_annual: DEMO_ASSUMPTION_DEFAULTS.holding_cost_annual,
-        shortage_penalty: DEMO_ASSUMPTION_DEFAULTS.shortage_penalty,
+        unit_cost: DEMO_ASSUMPTION_DEFAULTS.unit_cost,
+        order_cost: DEMO_ASSUMPTION_DEFAULTS.order_cost,
+        holding_rate: DEMO_ASSUMPTION_DEFAULTS.holding_rate,
+        shortage_cost: DEMO_ASSUMPTION_DEFAULTS.shortage_cost,
         lead_time_mean: DEMO_ASSUMPTION_DEFAULTS.lead_time_mean,
         lead_time_std: DEMO_ASSUMPTION_DEFAULTS.lead_time_std ?? 0,
-        service_level: DEMO_ASSUMPTION_DEFAULTS.service_level,
-        unit_cost: DEMO_ASSUMPTION_DEFAULTS.unit_cost,
+        target_service_level: DEMO_ASSUMPTION_DEFAULTS.target_service_level,
+        moq: DEMO_ASSUMPTION_DEFAULTS.moq ?? 1,
+        pack_size: DEMO_ASSUMPTION_DEFAULTS.pack_size ?? 1,
+        initial_stock: DEMO_ASSUMPTION_DEFAULTS.initial_stock ?? 0,
       };
 
       const skus = {};
+      const skusList = [];
       for (const skuId of skuIds) {
-        skus[skuId] = { ...defaultSkuValues };
+        const item = { sku_id: skuId, ...defaultSkuValues };
+        skus[skuId] = item;
+        skusList.push(item);
       }
 
       return res.status(200).json({
         data: {
           skuIds,
           skus,
+          skusList,
           values: defaultSkuValues,
           label:
             "Illustrative demonstration values. Replace them with your own costs and lead time.",
@@ -119,7 +130,10 @@ router.post(
           _id: session.activeDatasetId,
           userId: user.userId,
         });
-        expectedSkuIds = dataset?.validationSummary?.skuIds || [];
+        expectedSkuIds =
+          dataset?.transformationConfig?.skuIds ||
+          dataset?.validationSummary?.skuIds ||
+          [];
       }
       if (expectedSkuIds.length === 0 && session.activeForecastRunId) {
         const forecastRun = await ForecastRunModel.findOne({
@@ -131,8 +145,47 @@ router.post(
         );
       }
 
+      const skusMap = {};
+      if (Array.isArray(body.skus)) {
+        for (const item of body.skus) {
+          skusMap[item.sku_id] = {
+            ...item,
+            ordering_cost: item.order_cost,
+            shortage_penalty: item.shortage_cost,
+            service_level: item.target_service_level,
+            holding_rate:
+              item.holding_rate <= 1.0
+                ? item.holding_rate
+                : Math.min(1.0, item.holding_rate / (item.unit_cost || 1)),
+            holding_cost_annual:
+              item.holding_rate <= 1.0
+                ? item.holding_rate * item.unit_cost
+                : item.holding_rate,
+          };
+        }
+      } else {
+        for (const [skuId, item] of Object.entries(body.skus)) {
+          const sku_id = item.sku_id || skuId;
+          skusMap[skuId] = {
+            ...item,
+            sku_id,
+            ordering_cost: item.order_cost,
+            shortage_penalty: item.shortage_cost,
+            service_level: item.target_service_level,
+            holding_rate:
+              item.holding_rate <= 1.0
+                ? item.holding_rate
+                : Math.min(1.0, item.holding_rate / (item.unit_cost || 1)),
+            holding_cost_annual:
+              item.holding_rate <= 1.0
+                ? item.holding_rate * item.unit_cost
+                : item.holding_rate,
+          };
+        }
+      }
+
       for (const skuId of expectedSkuIds) {
-        if (!body.skus[skuId]) {
+        if (!skusMap[skuId]) {
           throw new AppError(
             "UNPROCESSABLE_ENTITY",
             `Missing assumptions for SKU ${skuId}. Every SKU in the session requires all fields.`,
@@ -140,7 +193,7 @@ router.post(
         }
       }
 
-      const provenance = computeProvenance(body.skus);
+      const provenance = computeProvenance(skusMap);
 
       // Retry loop on version duplicate key
       let assumptionDoc = null;
@@ -156,7 +209,7 @@ router.post(
             userId: user.userId,
             sessionId: params.sessionId,
             version: nextVersion,
-            skus: body.skus,
+            skus: skusMap,
             provenance,
             budget: body.budget ?? null,
             capacity: body.capacity ?? null,

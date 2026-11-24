@@ -411,15 +411,19 @@ router.post(
         });
       } catch (err) {
         // 8. On error persist assistant message with error status
-        await AiMessageModel.create({
-          userId,
-          sessionId: session._id.toString(),
-          conversationId,
-          role: "assistant",
-          content: "",
-          status: "error",
-          errorCode: err.code || "INTERNAL_ERROR",
-        });
+        try {
+          await AiMessageModel.create({
+            userId,
+            sessionId: session._id.toString(),
+            conversationId,
+            role: "assistant",
+            content: err.message || "An error occurred while processing the request.",
+            status: "error",
+            errorCode: err.code || "INTERNAL_ERROR",
+          });
+        } catch (persistErr) {
+          console.error("Failed to persist assistant error message:", persistErr);
+        }
         throw err;
       }
     } catch (err) {

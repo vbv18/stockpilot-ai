@@ -20,19 +20,21 @@ registerJobHandler("simulation", {
       userId: ctx.userId,
       sessionId: ctx.sessionId,
       status: "succeeded",
-    });
+    }).lean();
     if (!optRun) {
       throw new AppError("NOT_FOUND", "Optimization run not found");
     }
 
     const assumptionSet = await AssumptionSetModel.findById(
       optRun.assumptionSetId,
-    );
+    ).lean();
     if (!assumptionSet) {
       throw new AppError("NOT_FOUND", "Assumption set not found");
     }
 
-    const forecastRun = await ForecastRunModel.findById(optRun.forecastRunId);
+    const forecastRun = await ForecastRunModel.findById(
+      optRun.forecastRunId,
+    ).lean();
     if (!forecastRun || !forecastRun.result?.forecast?.skus) {
       throw new AppError("NOT_FOUND", "Forecast run not found");
     }
@@ -77,6 +79,10 @@ registerJobHandler("simulation", {
         rop_deterministic: optSku.rop_deterministic,
         rop_uncertainty_aware: optSku.rop_uncertainty_aware,
         rop_quantile: optSku.rop_quantile ?? optSku.rop_uncertainty_aware,
+        s_det: optSku.s_det ?? optSku.rop_deterministic,
+        s_quant:
+          optSku.s_quant ?? optSku.rop_quantile ?? optSku.rop_uncertainty_aware,
+        s_emp: optSku.s_emp ?? optSku.rop_uncertainty_aware,
       });
     }
 

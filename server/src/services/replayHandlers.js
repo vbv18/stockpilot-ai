@@ -6,6 +6,7 @@ import { ReplayRunModel } from "../models/replayRun.model.js";
 import { registerJobHandler } from "./jobRunner.js";
 import { loadProcessedSeries } from "./processedSeries.js";
 import { statsPost } from "./statsClient.js";
+import { scheduleReindex } from "./vector/scheduleReindex.js";
 
 registerJobHandler("replay", {
   async run(ctx) {
@@ -14,7 +15,7 @@ registerJobHandler("replay", {
     const assumptionSet = await AssumptionSetModel.findOne({
       _id: assumptionSetId,
       userId: ctx.userId,
-    });
+    }).lean();
     if (!assumptionSet) {
       throw new AppError("NOT_FOUND", "Assumption set not found");
     }
@@ -88,6 +89,8 @@ registerJobHandler("replay", {
       { _id: ctx.sessionId, userId: ctx.userId },
       { $set: { activeReplayRunId: replayRun._id } },
     );
+
+    scheduleReindex(ctx.userId, ctx.sessionId, "replay");
 
     return {
       resultRef: { collection: "replay_runs", id: replayRun._id.toString() },

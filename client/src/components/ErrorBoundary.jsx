@@ -1,5 +1,4 @@
 import { Component } from "react";
-import { Link } from "react-router-dom";
 
 export class ErrorBoundary extends Component {
   constructor(props) {
@@ -34,12 +33,12 @@ export class ErrorBoundary extends Component {
               >
                 Reload Page
               </button>
-              <Link
-                to="/sessions"
+              <a
+                href="/sessions"
                 className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-xs rounded-xl font-medium text-white"
               >
                 Go to Sessions
-              </Link>
+              </a>
             </div>
           </div>
         </div>

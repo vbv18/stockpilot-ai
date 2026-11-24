@@ -21,15 +21,16 @@ import ValidationPage from "./features/dataset/ValidationPage.jsx";
 import AssumptionsPage from "./features/assumptions/AssumptionsPage.jsx";
 
 const ForecastPage = lazy(() => import("./features/forecast/ForecastPage.jsx"));
-const OptimizationPage = lazy(() =>
-  import("./features/optimization/OptimizationPage.jsx")
+const OptimizationPage = lazy(
+  () => import("./features/optimization/OptimizationPage.jsx"),
 );
-const SimulationPage = lazy(() =>
-  import("./features/simulation/SimulationPage.jsx")
+const SimulationPage = lazy(
+  () => import("./features/simulation/SimulationPage.jsx"),
 );
-const PortfolioPage = lazy(() =>
-  import("./features/portfolio/PortfolioPage.jsx")
+const PortfolioPage = lazy(
+  () => import("./features/portfolio/PortfolioPage.jsx"),
 );
+const SummaryPage = lazy(() => import("./features/sessions/SummaryPage.jsx"));
 const AskAiPage = lazy(() => import("./features/ai/AskAiPage.jsx"));
 
 import { useGetSessionQuery } from "./lib/api.js";
@@ -121,6 +122,14 @@ export default function App() {
               element={
                 <Suspense fallback={<PageLoader />}>
                   <PortfolioPage />
+                </Suspense>
+              }
+            />
+            <Route
+              path="summary"
+              element={
+                <Suspense fallback={<PageLoader />}>
+                  <SummaryPage />
                 </Suspense>
               }
             />

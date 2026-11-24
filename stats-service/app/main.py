@@ -1,3 +1,4 @@
+import lightgbm
 import logging
 import time
 import uuid

@@ -1,9 +1,13 @@
 anyio==4.16.0
 fastapi==0.165.0
+joblib==1.6.0
+lightgbm==4.7.0
+matplotlib==3.11.2
 numpy==2.4.6
 pandas==2.3.3
 pydantic==2.14.3
 pydantic_core==2.50.4
+scikit-learn==1.9.1
 scipy==1.17.1
 starlette==1.10.0
 statsforecast==2.1.1

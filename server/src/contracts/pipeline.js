@@ -13,37 +13,74 @@ export const ForecastBody = z.object({ seed: Seed.optional() }).strict();
 
 export const SkuAssumptionsInput = z
   .object({
-    ordering_cost: z.number().finite().positive().max(1_000_000_000),
-    holding_cost_annual: z.number().finite().positive().max(1_000_000_000),
-    shortage_penalty: z.number().finite().positive().max(1_000_000_000),
+    sku_id: SkuId,
+    unit_cost: z.number().finite().positive().max(1_000_000_000),
+    order_cost: z.number().finite().positive().max(1_000_000_000),
+    holding_rate: z.number().finite().min(0).max(1_000_000_000),
+    shortage_cost: z.number().finite().positive().max(1_000_000_000),
     lead_time_mean: z.number().int().min(1).max(28),
     lead_time_std: z.number().finite().min(0).max(28).default(0),
-    service_level: z.number().finite().min(0.80).max(0.99),
-    unit_cost: z.number().finite().positive().max(1_000_000_000),
+    target_service_level: z.number().finite().min(0.8).max(0.99),
+    moq: z.number().int().min(1).default(1),
+    pack_size: z.number().int().min(1).default(1),
+    initial_stock: z.number().int().min(0).default(0),
+    ordering_cost: z.number().finite().positive().max(1_000_000_000).optional(),
+    holding_cost_annual: z
+      .number()
+      .finite()
+      .positive()
+      .max(1_000_000_000)
+      .optional(),
+    shortage_penalty: z
+      .number()
+      .finite()
+      .positive()
+      .max(1_000_000_000)
+      .optional(),
+    service_level: z.number().finite().min(0.8).max(0.99).optional(),
   })
   .strict();
 
 export const AssumptionsBody = z
   .object({
-    skus: z
-      .record(SkuId, SkuAssumptionsInput)
-      .refine((map) => Object.keys(map).length > 0, {
-        message: "At least one SKU assumption is required",
-      }),
+    skus: z.union([
+      z.array(SkuAssumptionsInput).min(1),
+      z
+        .record(SkuId, SkuAssumptionsInput)
+        .refine((map) => Object.keys(map).length > 0, {
+          message: "At least one SKU assumption is required",
+        }),
+    ]),
     confirmed: z.literal(true),
-    budget: z.number().finite().positive().max(1_000_000_000_000).optional().nullable(),
-    capacity: z.number().finite().positive().max(1_000_000_000_000).optional().nullable(),
+    budget: z
+      .number()
+      .finite()
+      .positive()
+      .max(1_000_000_000_000)
+      .optional()
+      .nullable(),
+    capacity: z
+      .number()
+      .finite()
+      .positive()
+      .max(1_000_000_000_000)
+      .optional()
+      .nullable(),
   })
   .strict();
 
 export const AssumptionFieldKey = z.enum([
-  "ordering_cost",
-  "holding_cost_annual",
-  "shortage_penalty",
+  "sku_id",
+  "unit_cost",
+  "order_cost",
+  "holding_rate",
+  "shortage_cost",
   "lead_time_mean",
   "lead_time_std",
-  "service_level",
-  "unit_cost",
+  "target_service_level",
+  "moq",
+  "pack_size",
+  "initial_stock",
 ]);
 export const AssumptionProvenance = z.enum([
   "demonstration_default",
@@ -51,8 +88,12 @@ export const AssumptionProvenance = z.enum([
 ]);
 
 export function holdingCostDaily(a) {
-  if (a.holding_cost_annual !== undefined) {
+  if (a.holding_cost_annual !== undefined && a.holding_cost_annual !== null) {
     return a.holding_cost_annual / 365;
+  }
+  if (a.holding_rate !== undefined && a.holding_rate !== null) {
+    const annual = a.holding_rate * (a.unit_cost || 1);
+    return annual / 365;
   }
   return a.holdingCostUnit === "per_unit_per_day"
     ? a.holdingCost
@@ -65,13 +106,22 @@ export function computeProvenance(skusMap) {
   const prov = {};
   for (const [skuId, s] of Object.entries(skusMap)) {
     prov[skuId] = {
-      ordering_cost: p(s.ordering_cost === d.ordering_cost),
-      holding_cost_annual: p(s.holding_cost_annual === d.holding_cost_annual),
-      shortage_penalty: p(s.shortage_penalty === d.shortage_penalty),
+      unit_cost: p(s.unit_cost === d.unit_cost),
+      order_cost: p((s.order_cost ?? s.ordering_cost) === d.order_cost),
+      holding_rate: p(
+        (s.holding_rate ?? s.holding_cost_annual) === d.holding_rate,
+      ),
+      shortage_cost: p(
+        (s.shortage_cost ?? s.shortage_penalty) === d.shortage_cost,
+      ),
       lead_time_mean: p(s.lead_time_mean === d.lead_time_mean),
       lead_time_std: p(s.lead_time_std === (d.lead_time_std ?? 0)),
-      service_level: p(s.service_level === d.service_level),
-      unit_cost: p(s.unit_cost === d.unit_cost),
+      target_service_level: p(
+        (s.target_service_level ?? s.service_level) === d.target_service_level,
+      ),
+      moq: p((s.moq ?? 1) === (d.moq ?? 1)),
+      pack_size: p((s.pack_size ?? 1) === (d.pack_size ?? 1)),
+      initial_stock: p((s.initial_stock ?? 0) === (d.initial_stock ?? 0)),
     };
   }
   return prov;
@@ -109,8 +159,20 @@ export const SessionPatchBody = z
   .object({
     name: z.string().trim().min(1).max(120).optional(),
     archived: z.boolean().optional(),
-    budget: z.number().finite().positive().max(1_000_000_000_000).optional().nullable(),
-    capacity: z.number().finite().positive().max(1_000_000_000_000).optional().nullable(),
+    budget: z
+      .number()
+      .finite()
+      .positive()
+      .max(1_000_000_000_000)
+      .optional()
+      .nullable(),
+    capacity: z
+      .number()
+      .finite()
+      .positive()
+      .max(1_000_000_000_000)
+      .optional()
+      .nullable(),
   })
   .strict()
   .refine(
@@ -126,8 +188,20 @@ export const SessionPatchBody = z
 
 export const PortfolioRunBody = z
   .object({
-    budget: z.number().finite().positive().max(1_000_000_000_000).optional().nullable(),
-    capacity: z.number().finite().positive().max(1_000_000_000_000).optional().nullable(),
+    budget: z
+      .number()
+      .finite()
+      .positive()
+      .max(1_000_000_000_000)
+      .optional()
+      .nullable(),
+    capacity: z
+      .number()
+      .finite()
+      .positive()
+      .max(1_000_000_000_000)
+      .optional()
+      .nullable(),
   })
   .strict();
 

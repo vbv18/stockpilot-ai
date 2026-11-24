@@ -50,7 +50,7 @@ export const stockpilotApi = createApi({
               { type: "Sessions", id: "LIST" },
             ]
           : [{ type: "Sessions", id: "LIST" }],
-      transformResponse: (response, meta, arg) => {
+      transformResponse: (response) => {
         // Return both items and meta if available
         return response;
       },
@@ -328,11 +328,19 @@ export const stockpilotApi = createApi({
     }),
 
     listMessages: builder.query({
-      query: ({ id, page = 1, limit = 50 }) => ({
-        url: `/ai/conversations/${id}/messages?page=${page}&limit=${limit}`,
-        method: "GET",
-      }),
-      providesTags: (result, error, { id }) => [{ type: "Messages", id }],
+      query: (arg) => {
+        const id = typeof arg === "string" ? arg : arg?.id;
+        const page = typeof arg === "object" && arg?.page ? arg.page : 1;
+        const limit = typeof arg === "object" && arg?.limit ? arg.limit : 50;
+        return {
+          url: `/ai/conversations/${id}/messages?page=${page}&limit=${limit}`,
+          method: "GET",
+        };
+      },
+      providesTags: (result, error, arg) => {
+        const id = typeof arg === "string" ? arg : arg?.id;
+        return [{ type: "Messages", id }];
+      },
     }),
 
     sendMessage: builder.mutation({
@@ -341,24 +349,67 @@ export const stockpilotApi = createApi({
         method: "POST",
         body: { content },
       }),
-      async onQueryStarted({ id }, { dispatch, queryFulfilled }) {
+      invalidatesTags: (result, error, { id }) => [
+        { type: "Messages", id },
+        { type: "Conversation", id },
+      ],
+      async onQueryStarted({ id, content }, { dispatch, queryFulfilled }) {
+        const tempId = `temp-${Date.now()}`;
+        const tempMsg = {
+          id: tempId,
+          conversationId: id,
+          role: "user",
+          content,
+          status: "ok",
+          createdAt: new Date().toISOString(),
+        };
+
+        const patchId = dispatch(
+          stockpilotApi.util.updateQueryData("listMessages", { id }, (draft) => {
+            if (Array.isArray(draft)) {
+              draft.push(tempMsg);
+            }
+          }),
+        );
+        const patchPaged = dispatch(
+          stockpilotApi.util.updateQueryData(
+            "listMessages",
+            { id, page: 1, limit: 50 },
+            (draft) => {
+              if (Array.isArray(draft)) {
+                draft.push(tempMsg);
+              }
+            },
+          ),
+        );
+
         try {
           const { data } = await queryFulfilled;
           if (data?.userMessage && data?.assistantMessage) {
+            const replaceOrAppend = (draft) => {
+              if (Array.isArray(draft)) {
+                const tempIndex = draft.findIndex((m) => m.id === tempId);
+                if (tempIndex !== -1) {
+                  draft.splice(tempIndex, 1, data.userMessage, data.assistantMessage);
+                } else if (!draft.some((m) => m.id === data.userMessage.id)) {
+                  draft.push(data.userMessage, data.assistantMessage);
+                }
+              }
+            };
+            dispatch(
+              stockpilotApi.util.updateQueryData("listMessages", { id }, replaceOrAppend),
+            );
             dispatch(
               stockpilotApi.util.updateQueryData(
                 "listMessages",
                 { id, page: 1, limit: 50 },
-                (draft) => {
-                  if (Array.isArray(draft)) {
-                    draft.push(data.userMessage, data.assistantMessage);
-                  }
-                },
+                replaceOrAppend,
               ),
             );
           }
         } catch {
-          // On failure let RTK Query handle error
+          patchId.undo();
+          patchPaged.undo();
         }
       },
     }),

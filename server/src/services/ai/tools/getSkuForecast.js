@@ -120,7 +120,8 @@ export async function getSkuForecast(rawArgs, bundle) {
     adi: skuData.adi ?? null,
     cv2: skuData.cv2 ?? null,
     chosenModel: skuData.chosen_model || evalData?.chosen_model || null,
-    maseImprovement: skuData.mase_improvement ?? evalData?.mase_improvement ?? null,
+    maseImprovement:
+      skuData.mase_improvement ?? evalData?.mase_improvement ?? null,
     message: skuData.message || null,
     nObservations: skuData.n_observations ?? 0,
     historyTail,

@@ -32,6 +32,7 @@ const ERROR_MAPPINGS = {
 export function ConversationPage() {
   const { conversationId } = useParams();
   const [content, setContent] = useState("");
+  const [lastSentText, setLastSentText] = useState("");
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [showNotice, setShowNotice] = useState(() => {
     return localStorage.getItem("sp:llmNoticeDismissed") !== "true";
@@ -80,9 +81,10 @@ export function ConversationPage() {
   };
 
   const handleSend = async (textToSend) => {
-    const text = (textToSend || content).trim();
+    const text = (textToSend || content || lastSentText).trim();
     if (!text || isSending) return;
 
+    setLastSentText(text);
     setContent("");
     try {
       await sendMessage({ id: conversationId, content: text }).unwrap();
@@ -273,7 +275,7 @@ export function ConversationPage() {
               )}
             </div>
             <button
-              onClick={() => handleSend()}
+              onClick={() => handleSend(lastSentText)}
               className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-rose-500/20 hover:bg-rose-500/30 font-medium text-xs text-white"
             >
               <RefreshCw size={12} />

@@ -1,0 +1,7 @@
+budget_pct,budget,status,greedy_cost,exact_cost,optimality_gap_pct,greedy_avg_service_level,exact_avg_service_level,greedy_inventory_investment,exact_inventory_investment,budget_shadow_price,binding_constraints
+0.72,11238.24,optimal,14076.41,14358.08,0.0,0.82,0.8,11338.98,11238.23,-6.696,budget
+0.78,12097.96,optimal,10436.31,10063.47,3.7049,0.852,0.84,12047.36,12095.41,-3.9441,budget
+0.83,12957.67,optimal,7691.89,7691.89,0.0,0.904,0.904,12939.64,12939.64,-2.0101,budget
+0.89,13817.39,optimal,6103.51,6101.25,0.0371,0.932,0.928,13791.89,13800.76,-1.3926,budget
+0.94,14677.1,optimal,5254.9,5254.9,0.0,0.964,0.964,14575.71,14575.71,-0.5588,budget
+1.0,15536.82,optimal,4792.64,4792.64,0.0,0.98,0.98,15536.82,15536.82,-0.2722,none

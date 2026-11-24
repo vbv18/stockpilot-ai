@@ -53,7 +53,12 @@ export function SkuDrawer({ sku, risk, skuAssumptions, onClose }) {
           <span className="font-bold underline text-white">{sku.eoq}</span>{" "}
           units when inventory position reaches{" "}
           <span className="font-bold underline text-white">
-            {sku.rop_uncertainty_aware ?? sku.rop_quantile ?? sku.rop_deterministic}
+            {sku.s_emp ??
+              sku.rop_uncertainty_aware ??
+              sku.s_quant ??
+              sku.rop_quantile ??
+              sku.s_det ??
+              sku.rop_deterministic}
           </span>{" "}
           units.
         </p>
@@ -177,7 +182,8 @@ export function SkuDrawer({ sku, risk, skuAssumptions, onClose }) {
               Deterministic ROP Raw
             </span>
             <span className="text-slate-200 font-medium">
-              {fmtNum(sku.rop_deterministic_raw, 2)} → {sku.rop_deterministic}
+              {fmtNum(sku.rop_deterministic_raw, 2)} →{" "}
+              {sku.s_det ?? sku.rop_deterministic}
             </span>
           </div>
           <div>
@@ -185,7 +191,8 @@ export function SkuDrawer({ sku, risk, skuAssumptions, onClose }) {
               Quantile ROP Raw
             </span>
             <span className="text-slate-200 font-medium">
-              {fmtNum(sku.rop_quantile_raw, 2)} → {sku.rop_quantile ?? "—"}
+              {fmtNum(sku.rop_quantile_raw, 2)} →{" "}
+              {sku.s_quant ?? sku.rop_quantile ?? "—"}
             </span>
           </div>
           <div>
@@ -194,7 +201,7 @@ export function SkuDrawer({ sku, risk, skuAssumptions, onClose }) {
             </span>
             <span className="text-slate-200 font-medium">
               {fmtNum(sku.rop_uncertainty_aware_raw, 2)} →{" "}
-              {sku.rop_uncertainty_aware}
+              {sku.s_emp ?? sku.rop_uncertainty_aware}
             </span>
           </div>
         </div>

@@ -87,7 +87,7 @@ router.get("/", validate({ params: IdParam }), async (req, res, next) => {
     const session = await getSessionOwned(user.userId, params.sessionId);
 
     if (!session.activeOptimizationRunId) {
-      throw new AppError("NOT_FOUND", "No active optimization run found");
+      return res.status(200).json({ data: null });
     }
 
     const run = await OptimizationRunModel.findOne({
@@ -96,7 +96,7 @@ router.get("/", validate({ params: IdParam }), async (req, res, next) => {
       sessionId: params.sessionId,
     });
     if (!run) {
-      throw new AppError("NOT_FOUND", "Optimization run not found");
+      return res.status(200).json({ data: null });
     }
 
     const assumptionDoc = await AssumptionSetModel.findById(

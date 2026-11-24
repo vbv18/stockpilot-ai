@@ -26,10 +26,10 @@ def generate_paths(
     block_size: int,
     rng: np.random.Generator,
 ) -> np.ndarray:
-    """Residual block bootstrap.
+    """Residual bootstrap indexed by horizon step h.
 
-    mean_path: baseline mean demand (length m). If horizon > m the mean is tiled (pattern repeated).
-    blocks: array (B, block_size) of residual blocks (actual - forecast).
+    mean_path: baseline mean demand (length m). If horizon > m the mean is tiled.
+    blocks: array (B, block_size) of out-of-sample rolling-origin forecast residual blocks.
     Returns array (n_paths, horizon) of demand clipped at zero (NOT rounded).
     """
     mean_path = np.asarray(mean_path, dtype=float)
@@ -38,8 +38,21 @@ def generate_paths(
         raise ValueError("residual blocks must have shape (B, block_size) with B >= 1")
     if mean_path.ndim != 1 or mean_path.shape[0] < 1:
         raise ValueError("mean_path must be a non-empty 1-D array")
+
     base = np.tile(mean_path, int(np.ceil(horizon / mean_path.shape[0])))[:horizon]
-    n_blocks = int(np.ceil(horizon / block_size))
-    idx = rng.integers(0, blocks.shape[0], size=(n_paths, n_blocks))
-    noise = blocks[idx].reshape(n_paths, n_blocks * block_size)[:, :horizon]
+    noise = np.zeros((n_paths, horizon), dtype=float)
+    b_len = blocks.shape[1]
+    min_pool = 10
+
+    for h in range(horizon):
+        step = h if h < b_len else (b_len - 1)
+        pool = blocks[:, step]
+        if len(pool) < min_pool:
+            start_step = max(0, step - 1)
+            end_step = min(b_len, step + 2)
+            pool = blocks[:, start_step:end_step].ravel()
+            if len(pool) < min_pool:
+                pool = blocks.ravel()
+        noise[:, h] = rng.choice(pool, size=n_paths, replace=True)
+
     return np.clip(base[None, :] + noise, 0.0, None)

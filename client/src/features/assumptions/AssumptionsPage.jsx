@@ -12,7 +12,7 @@ import {
   Play,
 } from "lucide-react";
 import { COPY } from "../../lib/copy.js";
-import { fmtDateTime, fmtInr, fmtPct } from "../../lib/format.js";
+import { fmtDateTime } from "../../lib/format.js";
 import {
   useCreateAssumptionsMutation,
   useGetAssumptionDefaultsQuery,
@@ -41,7 +41,10 @@ export default function AssumptionsPage() {
     if (latestVersion?.skus && Object.keys(latestVersion.skus).length > 0) {
       return Object.keys(latestVersion.skus);
     }
-    if (forecastData?.eligibleSkuIds && forecastData.eligibleSkuIds.length > 0) {
+    if (
+      forecastData?.eligibleSkuIds &&
+      forecastData.eligibleSkuIds.length > 0
+    ) {
       return forecastData.eligibleSkuIds;
     }
     if (forecastData?.forecast?.skus && forecastData.forecast.skus.length > 0) {
@@ -55,18 +58,21 @@ export default function AssumptionsPage() {
 
   const defaultRowValues = useMemo(
     () => ({
-      ordering_cost: 200,
-      holding_cost_annual: 1825,
-      shortage_penalty: 50,
+      unit_cost: 100,
+      order_cost: 200,
+      holding_rate: 18.25,
+      shortage_cost: 50,
       lead_time_mean: 7,
       lead_time_std: 0,
-      service_level: 0.95,
-      unit_cost: 100,
+      target_service_level: 0.95,
+      moq: 1,
+      pack_size: 1,
+      initial_stock: 0,
     }),
     [],
   );
 
-  // Form rows state: { [skuId]: { ordering_cost, holding_cost_annual, shortage_penalty, lead_time_mean, lead_time_std, service_level, unit_cost } }
+  // Form rows state: { [skuId]: { sku_id, unit_cost, order_cost, holding_rate, shortage_cost, lead_time_mean, lead_time_std, target_service_level, moq, pack_size, initial_stock } }
   const [rows, setRows] = useState({});
   const [budget, setBudget] = useState("");
   const [capacity, setCapacity] = useState("");
@@ -91,17 +97,30 @@ export default function AssumptionsPage() {
         defaultRowValues;
 
       initialRows[skuId] = {
-        ordering_cost: src.ordering_cost ?? defaultRowValues.ordering_cost,
-        holding_cost_annual:
-          src.holding_cost_annual ?? defaultRowValues.holding_cost_annual,
-        shortage_penalty:
-          src.shortage_penalty ?? defaultRowValues.shortage_penalty,
+        sku_id: skuId,
+        unit_cost: src.unit_cost ?? defaultRowValues.unit_cost,
+        order_cost:
+          src.order_cost ?? src.ordering_cost ?? defaultRowValues.order_cost,
+        holding_rate:
+          src.holding_rate ??
+          src.holding_cost_annual ??
+          defaultRowValues.holding_rate,
+        shortage_cost:
+          src.shortage_cost ??
+          src.shortage_penalty ??
+          defaultRowValues.shortage_cost,
         lead_time_mean: src.lead_time_mean ?? defaultRowValues.lead_time_mean,
         lead_time_std: src.lead_time_std ?? defaultRowValues.lead_time_std,
-        service_level: src.service_level ?? defaultRowValues.service_level,
-        unit_cost: src.unit_cost ?? defaultRowValues.unit_cost,
+        target_service_level:
+          src.target_service_level ??
+          src.service_level ??
+          defaultRowValues.target_service_level,
+        moq: src.moq ?? defaultRowValues.moq,
+        pack_size: src.pack_size ?? defaultRowValues.pack_size,
+        initial_stock: src.initial_stock ?? defaultRowValues.initial_stock,
       };
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setRows(initialRows);
 
     if (session?.budget !== undefined && session?.budget !== null) {
@@ -138,13 +157,14 @@ export default function AssumptionsPage() {
     setRows((prev) => ({
       ...prev,
       [skuId]: {
-        ...(prev[skuId] || defaultRowValues),
+        ...(prev[skuId] || { ...defaultRowValues, sku_id: skuId }),
+        sku_id: skuId,
         [field]: rawValue === "" ? "" : Number(rawValue),
       },
     }));
   };
 
-  // Validation per row
+  // Validation per row/card
   const validationResults = useMemo(() => {
     const rowStatus = {};
     let allValid = skuIds.length > 0;
@@ -156,7 +176,10 @@ export default function AssumptionsPage() {
         allValid = false;
         continue;
       }
-      const parsed = skuAssumptionRowSchema.safeParse(row);
+      const parsed = skuAssumptionRowSchema.safeParse({
+        ...row,
+        sku_id: skuId,
+      });
       if (!parsed.success) {
         const fieldErrors = {};
         for (const issue of parsed.error.issues) {
@@ -175,12 +198,18 @@ export default function AssumptionsPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!isAllValid || !confirmed || isSubmitting || skuIds.length === 0) return;
+    if (!isAllValid || !confirmed || isSubmitting || skuIds.length === 0)
+      return;
     setSubmitError("");
 
-    const parsedPayload = {};
+    const parsedArray = [];
     for (const skuId of skuIds) {
-      parsedPayload[skuId] = skuAssumptionRowSchema.parse(rows[skuId]);
+      parsedArray.push(
+        skuAssumptionRowSchema.parse({
+          ...rows[skuId],
+          sku_id: skuId,
+        }),
+      );
     }
 
     const numBudget =
@@ -208,7 +237,7 @@ export default function AssumptionsPage() {
       await createAssumptions({
         id: session.id,
         body: {
-          skus: parsedPayload,
+          skus: parsedArray,
           confirmed: true,
           budget: numBudget,
           capacity: numCapacity,
@@ -235,7 +264,25 @@ export default function AssumptionsPage() {
       const next = { ...prev };
       for (const skuId of skuIds) {
         if (ver.skus[skuId]) {
-          next[skuId] = { ...ver.skus[skuId] };
+          next[skuId] = {
+            sku_id: skuId,
+            unit_cost: ver.skus[skuId].unit_cost,
+            order_cost:
+              ver.skus[skuId].order_cost ?? ver.skus[skuId].ordering_cost,
+            holding_rate:
+              ver.skus[skuId].holding_rate ??
+              ver.skus[skuId].holding_cost_annual,
+            shortage_cost:
+              ver.skus[skuId].shortage_cost ?? ver.skus[skuId].shortage_penalty,
+            lead_time_mean: ver.skus[skuId].lead_time_mean,
+            lead_time_std: ver.skus[skuId].lead_time_std ?? 0,
+            target_service_level:
+              ver.skus[skuId].target_service_level ??
+              ver.skus[skuId].service_level,
+            moq: ver.skus[skuId].moq ?? 1,
+            pack_size: ver.skus[skuId].pack_size ?? 1,
+            initial_stock: ver.skus[skuId].initial_stock ?? 0,
+          };
         }
       }
       return next;
@@ -277,7 +324,9 @@ export default function AssumptionsPage() {
               Session Portfolio Constraints
             </h4>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Set session-level inventory boundaries. Both are optional here, but at least one must be set to run multi-SKU Portfolio Optimization.
+              Set session-level inventory boundaries. Both are optional here,
+              but at least one must be set to run multi-SKU Portfolio
+              Optimization.
             </p>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -295,9 +344,11 @@ export default function AssumptionsPage() {
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
               />
               <span className="text-[10px] text-slate-500 mt-1 block">
-                Upper limit on total inventory investment: sum(avg_inventory_i · unit_cost_i) ≤ budget
+                Upper limit on total inventory investment: sum(avg_inventory_i ·
+                unit_cost_i) ≤ budget
               </span>
             </div>
+
             <div>
               <label className="block text-[11px] font-medium text-slate-300 mb-1">
                 Max Total Capacity (units)
@@ -312,7 +363,8 @@ export default function AssumptionsPage() {
                 className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 font-mono"
               />
               <span className="text-[10px] text-slate-500 mt-1 block">
-                Upper limit on total units across all SKUs: sum(avg_inventory_i) ≤ capacity
+                Upper limit on total units across all SKUs: sum(avg_inventory_i)
+                ≤ capacity
               </span>
             </div>
           </div>
@@ -321,11 +373,11 @@ export default function AssumptionsPage() {
         <div className="flex items-center justify-between pb-2 border-b border-white/[0.06]">
           <div>
             <h3 className="text-xs font-semibold text-slate-200">
-              Assumptions Table ({skuIds.length} SKUs)
+              SKU Inventory Parameters ({skuIds.length} SKUs)
             </h3>
             <p className="text-[11px] text-slate-400 mt-0.5">
-              Edit individual cell values. Service level must be between 0.80
-              and 0.99. Lead time mean must be between 1 and 28 days.
+              Every field must be populated and valid for each SKU before
+              optimization can proceed.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -339,243 +391,346 @@ export default function AssumptionsPage() {
               {isAllValid ? (
                 <>
                   <CheckCircle size={12} />
-                  <span>All rows valid</span>
+                  <span>All SKUs complete</span>
                 </>
               ) : (
                 <>
                   <AlertCircle size={12} />
-                  <span>Pending validation</span>
+                  <span>Incomplete SKUs pending</span>
                 </>
               )}
             </span>
           </div>
         </div>
 
-        {/* Editable Table */}
-        <div className="overflow-x-auto rounded-xl border border-white/[0.06] bg-[#0d0f14]/80">
-          <table className="w-full text-left text-xs border-collapse">
-            <thead>
-              <tr className="border-b border-white/[0.08] text-slate-400 bg-white/[0.02]">
-                <th scope="col" className="px-3 py-3 font-semibold text-slate-300">
-                  SKU
-                </th>
-                <th scope="col" className="px-3 py-3 font-semibold text-slate-300">
-                  Ordering Cost (₹)
-                </th>
-                <th scope="col" className="px-3 py-3 font-semibold text-slate-300">
-                  Annual Holding (₹)
-                </th>
-                <th scope="col" className="px-3 py-3 font-semibold text-slate-300">
-                  Shortage Penalty (₹)
-                </th>
-                <th scope="col" className="px-3 py-3 font-semibold text-slate-300">
-                  Lead Time Mean (d)
-                </th>
-                <th scope="col" className="px-3 py-3 font-semibold text-slate-300">
-                  Lead Time Std (d)
-                </th>
-                <th scope="col" className="px-3 py-3 font-semibold text-slate-300">
-                  Service Level (0.80–0.99)
-                </th>
-                <th scope="col" className="px-3 py-3 font-semibold text-slate-300">
-                  Unit Cost (₹)
-                </th>
-                <th scope="col" className="px-2 py-3 text-center font-semibold text-slate-400">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/[0.04] text-slate-200 font-mono">
-              {skuIds.map((skuId) => {
-                const row = rows[skuId] || defaultRowValues;
-                const status = validationResults.rowStatus[skuId] || {
-                  valid: true,
-                  errors: {},
-                };
-                const errs = status.errors;
+        {/* Editable Cards List - One per SKU */}
+        <div className="flex flex-col gap-4">
+          {skuIds.map((skuId) => {
+            const row = rows[skuId] || { ...defaultRowValues, sku_id: skuId };
+            const status = validationResults.rowStatus[skuId] || {
+              valid: true,
+              errors: {},
+            };
+            const errs = status.errors;
 
-                return (
-                  <tr
-                    key={skuId}
-                    className={`hover:bg-white/[0.02] transition-colors ${
-                      !status.valid ? "bg-rose-500/[0.02]" : ""
-                    }`}
-                  >
-                    <td className="px-3 py-2 font-sans font-bold text-slate-100 whitespace-nowrap">
+            return (
+              <div
+                key={skuId}
+                className={`bg-[#0d0f14]/80 border rounded-xl p-4.5 transition-all ${
+                  status.valid
+                    ? "border-white/[0.08] hover:border-white/[0.16]"
+                    : "border-rose-500/40 bg-rose-500/[0.02]"
+                }`}
+              >
+                <div className="flex items-center justify-between pb-3 mb-3 border-b border-white/[0.06]">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold font-mono text-white bg-slate-800/80 px-2.5 py-1 rounded-md border border-white/[0.06]">
                       {skuId}
-                    </td>
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      Inventory Policy Parameters
+                    </span>
+                  </div>
+                  <div>
+                    {status.valid ? (
+                      <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                        <CheckCircle size={12} />
+                        <span>Valid</span>
+                      </span>
+                    ) : (
+                      <span className="text-[11px] text-rose-400 font-medium flex items-center gap-1 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/20">
+                        <AlertCircle size={12} />
+                        <span>Requires Attention</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
 
-                    {/* ordering_cost */}
-                    <td className="px-2 py-1.5">
-                      <input
-                        type="number"
-                        step="any"
-                        value={row.ordering_cost ?? ""}
-                        onChange={(e) =>
-                          handleCellChange(skuId, "ordering_cost", e.target.value)
-                        }
-                        className={`w-28 bg-slate-900 border rounded-lg px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 ${
-                          errs.ordering_cost
-                            ? "border-rose-500 bg-rose-500/10"
-                            : "border-slate-700"
-                        }`}
-                        title={errs.ordering_cost}
-                      />
-                    </td>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+                  {/* unit_cost */}
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                      Unit Cost (₹)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0.01"
+                      value={row.unit_cost ?? ""}
+                      onChange={(e) =>
+                        handleCellChange(skuId, "unit_cost", e.target.value)
+                      }
+                      className={`w-full bg-slate-900 border rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 ${
+                        errs.unit_cost
+                          ? "border-rose-500 bg-rose-500/10"
+                          : "border-slate-700"
+                      }`}
+                      placeholder="e.g. 100"
+                    />
+                    {errs.unit_cost && (
+                      <span className="text-[10px] text-rose-400 mt-1 block">
+                        {errs.unit_cost}
+                      </span>
+                    )}
+                  </div>
 
-                    {/* holding_cost_annual */}
-                    <td className="px-2 py-1.5">
-                      <input
-                        type="number"
-                        step="any"
-                        value={row.holding_cost_annual ?? ""}
-                        onChange={(e) =>
-                          handleCellChange(
-                            skuId,
-                            "holding_cost_annual",
-                            e.target.value,
-                          )
-                        }
-                        className={`w-28 bg-slate-900 border rounded-lg px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 ${
-                          errs.holding_cost_annual
-                            ? "border-rose-500 bg-rose-500/10"
-                            : "border-slate-700"
-                        }`}
-                        title={errs.holding_cost_annual}
-                      />
-                    </td>
+                  {/* order_cost */}
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                      Order Cost (₹)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0.01"
+                      value={row.order_cost ?? ""}
+                      onChange={(e) =>
+                        handleCellChange(skuId, "order_cost", e.target.value)
+                      }
+                      className={`w-full bg-slate-900 border rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 ${
+                        errs.order_cost
+                          ? "border-rose-500 bg-rose-500/10"
+                          : "border-slate-700"
+                      }`}
+                      placeholder="e.g. 200"
+                    />
+                    {errs.order_cost && (
+                      <span className="text-[10px] text-rose-400 mt-1 block">
+                        {errs.order_cost}
+                      </span>
+                    )}
+                  </div>
 
-                    {/* shortage_penalty */}
-                    <td className="px-2 py-1.5">
-                      <input
-                        type="number"
-                        step="any"
-                        value={row.shortage_penalty ?? ""}
-                        onChange={(e) =>
-                          handleCellChange(
-                            skuId,
-                            "shortage_penalty",
-                            e.target.value,
-                          )
-                        }
-                        className={`w-28 bg-slate-900 border rounded-lg px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 ${
-                          errs.shortage_penalty
-                            ? "border-rose-500 bg-rose-500/10"
-                            : "border-slate-700"
-                        }`}
-                        title={errs.shortage_penalty}
-                      />
-                    </td>
+                  {/* holding_rate */}
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                      Holding Rate (₹/yr)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0.01"
+                      value={row.holding_rate ?? ""}
+                      onChange={(e) =>
+                        handleCellChange(skuId, "holding_rate", e.target.value)
+                      }
+                      className={`w-full bg-slate-900 border rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 ${
+                        errs.holding_rate
+                          ? "border-rose-500 bg-rose-500/10"
+                          : "border-slate-700"
+                      }`}
+                      placeholder="e.g. 18.25"
+                    />
+                    {errs.holding_rate && (
+                      <span className="text-[10px] text-rose-400 mt-1 block">
+                        {errs.holding_rate}
+                      </span>
+                    )}
+                  </div>
 
-                    {/* lead_time_mean */}
-                    <td className="px-2 py-1.5">
-                      <input
-                        type="number"
-                        step="1"
-                        min="1"
-                        max="28"
-                        value={row.lead_time_mean ?? ""}
-                        onChange={(e) =>
-                          handleCellChange(
-                            skuId,
-                            "lead_time_mean",
-                            e.target.value,
-                          )
-                        }
-                        className={`w-24 bg-slate-900 border rounded-lg px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 ${
-                          errs.lead_time_mean
-                            ? "border-rose-500 bg-rose-500/10"
-                            : "border-slate-700"
-                        }`}
-                        title={errs.lead_time_mean}
-                      />
-                    </td>
+                  {/* shortage_cost */}
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                      Shortage Cost (₹)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0.01"
+                      value={row.shortage_cost ?? ""}
+                      onChange={(e) =>
+                        handleCellChange(skuId, "shortage_cost", e.target.value)
+                      }
+                      className={`w-full bg-slate-900 border rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 ${
+                        errs.shortage_cost
+                          ? "border-rose-500 bg-rose-500/10"
+                          : "border-slate-700"
+                      }`}
+                      placeholder="e.g. 50"
+                    />
+                    {errs.shortage_cost && (
+                      <span className="text-[10px] text-rose-400 mt-1 block">
+                        {errs.shortage_cost}
+                      </span>
+                    )}
+                  </div>
 
-                    {/* lead_time_std */}
-                    <td className="px-2 py-1.5">
-                      <input
-                        type="number"
-                        step="any"
-                        min="0"
-                        max="28"
-                        value={row.lead_time_std ?? ""}
-                        onChange={(e) =>
-                          handleCellChange(
-                            skuId,
-                            "lead_time_std",
-                            e.target.value,
-                          )
-                        }
-                        className={`w-24 bg-slate-900 border rounded-lg px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 ${
-                          errs.lead_time_std
-                            ? "border-rose-500 bg-rose-500/10"
-                            : "border-slate-700"
-                        }`}
-                        title={errs.lead_time_std}
-                      />
-                    </td>
+                  {/* lead_time_mean */}
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                      Lead Time Mean (d)
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      max="28"
+                      value={row.lead_time_mean ?? ""}
+                      onChange={(e) =>
+                        handleCellChange(
+                          skuId,
+                          "lead_time_mean",
+                          e.target.value,
+                        )
+                      }
+                      className={`w-full bg-slate-900 border rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 ${
+                        errs.lead_time_mean
+                          ? "border-rose-500 bg-rose-500/10"
+                          : "border-slate-700"
+                      }`}
+                      placeholder="1-28"
+                    />
+                    {errs.lead_time_mean && (
+                      <span className="text-[10px] text-rose-400 mt-1 block">
+                        {errs.lead_time_mean}
+                      </span>
+                    )}
+                  </div>
 
-                    {/* service_level */}
-                    <td className="px-2 py-1.5">
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0.80"
-                        max="0.99"
-                        value={row.service_level ?? ""}
-                        onChange={(e) =>
-                          handleCellChange(
-                            skuId,
-                            "service_level",
-                            e.target.value,
-                          )
-                        }
-                        className={`w-28 bg-slate-900 border rounded-lg px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 ${
-                          errs.service_level
-                            ? "border-rose-500 bg-rose-500/10"
-                            : "border-slate-700"
-                        }`}
-                        title={errs.service_level}
-                      />
-                    </td>
+                  {/* lead_time_std */}
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                      Lead Time Std (d)
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      max="28"
+                      value={row.lead_time_std ?? ""}
+                      onChange={(e) =>
+                        handleCellChange(skuId, "lead_time_std", e.target.value)
+                      }
+                      className={`w-full bg-slate-900 border rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 ${
+                        errs.lead_time_std
+                          ? "border-rose-500 bg-rose-500/10"
+                          : "border-slate-700"
+                      }`}
+                      placeholder="0-28"
+                    />
+                    {errs.lead_time_std && (
+                      <span className="text-[10px] text-rose-400 mt-1 block">
+                        {errs.lead_time_std}
+                      </span>
+                    )}
+                  </div>
 
-                    {/* unit_cost */}
-                    <td className="px-2 py-1.5">
-                      <input
-                        type="number"
-                        step="any"
-                        min="0.01"
-                        value={row.unit_cost ?? ""}
-                        onChange={(e) =>
-                          handleCellChange(skuId, "unit_cost", e.target.value)
-                        }
-                        className={`w-28 bg-slate-900 border rounded-lg px-2 py-1 text-xs text-slate-100 focus:outline-none focus:border-indigo-500 ${
-                          errs.unit_cost
-                            ? "border-rose-500 bg-rose-500/10"
-                            : "border-slate-700"
-                        }`}
-                        title={errs.unit_cost}
-                      />
-                    </td>
+                  {/* target_service_level */}
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                      Service Level (0.80–0.99)
+                    </label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0.80"
+                      max="0.99"
+                      value={row.target_service_level ?? ""}
+                      onChange={(e) =>
+                        handleCellChange(
+                          skuId,
+                          "target_service_level",
+                          e.target.value,
+                        )
+                      }
+                      className={`w-full bg-slate-900 border rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 ${
+                        errs.target_service_level
+                          ? "border-rose-500 bg-rose-500/10"
+                          : "border-slate-700"
+                      }`}
+                      placeholder="0.95"
+                    />
+                    {errs.target_service_level && (
+                      <span className="text-[10px] text-rose-400 mt-1 block">
+                        {errs.target_service_level}
+                      </span>
+                    )}
+                  </div>
 
-                    <td className="px-2 py-1.5 text-center">
-                      {status.valid ? (
-                        <CheckCircle
-                          size={14}
-                          className="text-emerald-400 mx-auto"
-                        />
-                      ) : (
-                        <AlertCircle
-                          size={14}
-                          className="text-rose-400 mx-auto"
-                        />
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                  {/* moq */}
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                      Min Order Qty (MOQ)
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      value={row.moq ?? ""}
+                      onChange={(e) =>
+                        handleCellChange(skuId, "moq", e.target.value)
+                      }
+                      className={`w-full bg-slate-900 border rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 ${
+                        errs.moq
+                          ? "border-rose-500 bg-rose-500/10"
+                          : "border-slate-700"
+                      }`}
+                      placeholder="e.g. 1"
+                    />
+                    {errs.moq && (
+                      <span className="text-[10px] text-rose-400 mt-1 block">
+                        {errs.moq}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* pack_size */}
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                      Pack Size (units)
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="1"
+                      value={row.pack_size ?? ""}
+                      onChange={(e) =>
+                        handleCellChange(skuId, "pack_size", e.target.value)
+                      }
+                      className={`w-full bg-slate-900 border rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 ${
+                        errs.pack_size
+                          ? "border-rose-500 bg-rose-500/10"
+                          : "border-slate-700"
+                      }`}
+                      placeholder="e.g. 1"
+                    />
+                    {errs.pack_size && (
+                      <span className="text-[10px] text-rose-400 mt-1 block">
+                        {errs.pack_size}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* initial_stock */}
+                  <div>
+                    <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                      Initial Stock (units)
+                    </label>
+                    <input
+                      type="number"
+                      step="1"
+                      min="0"
+                      value={row.initial_stock ?? ""}
+                      onChange={(e) =>
+                        handleCellChange(skuId, "initial_stock", e.target.value)
+                      }
+                      className={`w-full bg-slate-900 border rounded-lg px-2.5 py-1.5 text-xs text-slate-100 font-mono focus:outline-none focus:border-indigo-500 ${
+                        errs.initial_stock
+                          ? "border-rose-500 bg-rose-500/10"
+                          : "border-slate-700"
+                      }`}
+                      placeholder="e.g. 0"
+                    />
+                    {errs.initial_stock && (
+                      <span className="text-[10px] text-rose-400 mt-1 block">
+                        {errs.initial_stock}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Confirmation & Submission Bar */}
@@ -593,13 +748,16 @@ export default function AssumptionsPage() {
           <div className="flex items-center gap-3 self-end sm:self-auto">
             {!isAllValid && (
               <span className="text-xs text-rose-400 font-sans">
-                Every row must have valid parameters to run optimization.
+                Every SKU must have all fields completed and valid before
+                running optimization.
               </span>
             )}
 
             <button
               type="submit"
-              disabled={!isAllValid || !confirmed || isSubmitting || skuIds.length === 0}
+              disabled={
+                !isAllValid || !confirmed || isSubmitting || skuIds.length === 0
+              }
               className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-semibold text-white shadow-md shadow-indigo-700/20 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer transition-all"
             >
               {isSubmitting ? (

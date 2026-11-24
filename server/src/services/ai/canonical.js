@@ -32,7 +32,7 @@ export function buildSessionDigest(bundle, risks = null) {
   // Assumptions view
   let assumptionsView = null;
   if (assumptions) {
-    const skusMap =
+    const rawMap =
       assumptions.skus instanceof Map
         ? Object.fromEntries(assumptions.skus)
         : assumptions.skus ||
@@ -42,7 +42,7 @@ export function buildSessionDigest(bundle, risks = null) {
           {};
     assumptionsView = {
       version: assumptions.version ?? 1,
-      skus: skusMap,
+      skuCount: Object.keys(rawMap).length,
     };
   }
 
@@ -61,37 +61,37 @@ export function buildSessionDigest(bundle, risks = null) {
 
   for (const skuId of [...allSkuIds].sort()) {
     const fData = forecastSkus[skuId];
-    const eData = evalSkus[skuId];
     const oData = optSkus[skuId];
-    const sData = simSkus[skuId];
     const rData = riskMap.get(skuId);
 
-    const autoetsMean = fData?.autoets_mean || [];
-    const avgDailyForecast =
-      autoetsMean.length > 0
-        ? autoetsMean.reduce((a, b) => a + b, 0) / autoetsMean.length
-        : null;
-
-    skus.push({
+    const skuEntry = {
       skuId,
-      forecastStatus: fData?.status || null,
-      intervalStatus: fData?.interval_status || null,
-      avgDailyForecast,
-      holdoutWapeAutoets: eData?.autoets?.wape ?? null,
-      holdoutCoverage: eData?.interval_metrics?.coverage_p10_p90 ?? null,
+      forecastStatus: fData?.status || "ok",
       eoq: oData?.eoq ?? null,
-      ropDeterministic: oData?.rop_deterministic ?? null,
-      ropQuantile: oData?.rop_quantile ?? null,
-      ropUncertaintyAware: oData?.rop_uncertainty_aware ?? null,
-      ropGap: oData?.rop_gap ?? null,
+      sDet: oData?.s_det ?? oData?.rop_deterministic ?? null,
+      sEmp: oData?.s_emp ?? oData?.rop_uncertainty_aware ?? null,
       riskLevel: rData?.level || null,
-      simDetTotalCost: sData?.deterministic?.mean_total_cost ?? null,
-      simQuaTotalCost: sData?.quantile?.mean_total_cost ?? null,
-      simUncTotalCost: sData?.uncertainty_aware?.mean_total_cost ?? null,
-      simDetServiceLevel: sData?.deterministic?.service_level ?? null,
-      simQuaServiceLevel: sData?.quantile?.service_level ?? null,
-      simUncServiceLevel: sData?.uncertainty_aware?.service_level ?? null,
-    });
+    };
+    const cleanEntry = {};
+    for (const [k, v] of Object.entries(skuEntry)) {
+      if (v !== null && v !== undefined) cleanEntry[k] = v;
+    }
+    skus.push(cleanEntry);
+  }
+
+  let dependencySummary = null;
+  if (optimizationRun?.result?.dependency) {
+    const dep = optimizationRun.result.dependency;
+    dependencySummary = {
+      poolingRatio: dep.pooling_ratio ?? null,
+      pairsCount: dep.pairs?.length ?? 0,
+      topPairs: (dep.pairs || []).slice(0, 3).map((p) => ({
+        sku_i: p.sku_i,
+        sku_j: p.sku_j,
+        rho: p.rho,
+        relation: p.relation,
+      })),
+    };
   }
 
   let portfolioSummary = null;
@@ -104,6 +104,11 @@ export function buildSessionDigest(bundle, risks = null) {
       totalCostDelta: pr.total_cost_delta ?? null,
       bindingConstraints: pr.binding_constraints || [],
       budgetShadowPrice: pr.budget_shadow_price ?? null,
+      shadowPrice: pr.shadow_price ?? pr.budget_shadow_price ?? null,
+      exactCost: pr.exact_cost ?? null,
+      greedyCost: pr.greedy_cost ?? null,
+      optimalityGapPct: pr.optimality_gap_pct ?? null,
+      minimumFeasibleBudget: pr.minimum_feasible_budget ?? null,
       unconstrainedTotalCost: pr.unconstrained_plan?.total_cost ?? null,
       constrainedTotalCost: pr.constrained_plan?.total_cost ?? null,
       budgetUsagePct: pr.budget_usage_pct ?? null,
@@ -117,8 +122,16 @@ export function buildSessionDigest(bundle, risks = null) {
     replaySummary = {
       status: replayRun.status,
       holdoutDays: replayRun.holdoutDays ?? 28,
-      aggregate: rr.aggregate || null,
+      costDeterministic: rr.aggregate?.deterministic?.total_cost ?? null,
+      costUncertaintyAware: rr.aggregate?.uncertainty_aware?.total_cost ?? null,
     };
+  }
+
+  let forecastAggregate = null;
+  if (forecastRun?.result?.evaluation?.aggregate) {
+    const { model_comparison, ...rest } =
+      forecastRun.result.evaluation.aggregate;
+    forecastAggregate = rest;
   }
 
   return {
@@ -137,9 +150,10 @@ export function buildSessionDigest(bundle, risks = null) {
         }
       : null,
     assumptions: assumptionsView,
-    forecastAggregate: forecastRun?.result?.evaluation?.aggregate || null,
+    forecastAggregate,
     skus,
     simulationAggregate: simulationRun?.result?.aggregate || null,
+    dependency: dependencySummary,
     portfolio: portfolioSummary,
     replay: replaySummary,
   };
@@ -174,24 +188,31 @@ export function loadCanonicalForHit(bundle, hit) {
 
     case "dataset_summary": {
       if (!dataset?.validationSummary) return null;
+      const vs = dataset.validationSummary;
       return {
         artifactType: "dataset",
         artifactId: dataset._id.toString(),
         skuId: null,
         label: "Dataset summary",
-        payload: dataset.validationSummary,
+        payload: {
+          skuCount: vs.skuIds ? vs.skuIds.length : 0,
+          dateRange: vs.dateRange || null,
+          acceptedRows: vs.acceptedRows,
+          totalRows: vs.totalRows,
+        },
       };
     }
 
     case "forecast_aggregate": {
       const agg = forecastRun?.result?.evaluation?.aggregate;
       if (!agg) return null;
+      const { model_comparison, ...rest } = agg;
       return {
         artifactType: "evaluation",
         artifactId: forecastRun._id.toString(),
         skuId: null,
         label: "Forecast evaluation aggregate",
-        payload: agg,
+        payload: rest,
       };
     }
 
@@ -257,6 +278,7 @@ export function loadCanonicalForHit(bundle, hit) {
 
     case "optimization_aggregate": {
       if (!optimizationRun?.result) return null;
+      const dep = optimizationRun.result.dependency;
       return {
         artifactType: "optimization_run",
         artifactId: optimizationRun._id.toString(),
@@ -264,6 +286,9 @@ export function loadCanonicalForHit(bundle, hit) {
         label: "Optimization aggregate",
         payload: {
           skusCount: Object.keys(optimizationRun.result.skus || {}).length,
+          poolingRatio: dep?.pooling_ratio ?? null,
+          pairsCount: dep?.pairs?.length ?? 0,
+          topPairs: (dep?.pairs || []).slice(0, 5),
         },
       };
     }
@@ -294,21 +319,27 @@ export function loadCanonicalForHit(bundle, hit) {
 
     case "portfolio_aggregate": {
       if (!portfolioRun?.result) return null;
+      const pr = portfolioRun.result;
       return {
         artifactType: "portfolio_run",
         artifactId: portfolioRun._id.toString(),
         skuId: null,
         label: "Portfolio optimization aggregate",
         payload: {
-          budget: portfolioRun.result.budget ?? null,
-          capacity: portfolioRun.result.capacity ?? null,
-          bindingConstraints: portfolioRun.result.binding_constraints || [],
-          budgetShadowPrice: portfolioRun.result.budget_shadow_price ?? null,
-          totalCostDelta: portfolioRun.result.total_cost_delta ?? null,
-          budgetUsagePct: portfolioRun.result.budget_usage_pct ?? null,
-          capacityUsagePct: portfolioRun.result.capacity_usage_pct ?? null,
-          unconstrained: portfolioRun.result.unconstrained_plan,
-          constrained: portfolioRun.result.constrained_plan,
+          budget: pr.budget ?? null,
+          capacity: pr.capacity ?? null,
+          bindingConstraints: pr.binding_constraints || [],
+          budgetShadowPrice: pr.budget_shadow_price ?? null,
+          shadowPrice: pr.shadow_price ?? pr.budget_shadow_price ?? null,
+          exactCost: pr.exact_cost ?? null,
+          greedyCost: pr.greedy_cost ?? null,
+          optimalityGapPct: pr.optimality_gap_pct ?? null,
+          minimumFeasibleBudget: pr.minimum_feasible_budget ?? null,
+          totalCostDelta: pr.total_cost_delta ?? null,
+          budgetUsagePct: pr.budget_usage_pct ?? null,
+          capacityUsagePct: pr.capacity_usage_pct ?? null,
+          unconstrained: pr.unconstrained_plan,
+          constrained: pr.constrained_plan,
         },
       };
     }
@@ -339,6 +370,12 @@ export function loadCanonicalForHit(bundle, hit) {
           skuId,
           unconstrained: u || null,
           constrained: c || null,
+          exactCost: c?.exact_cost ?? null,
+          greedyCost: c?.greedy_cost ?? null,
+          exactServiceLevel: c?.exact_service_level ?? null,
+          greedyServiceLevel: c?.greedy_service_level ?? null,
+          exactRop: c?.exact_rop ?? null,
+          greedyRop: c?.greedy_rop ?? null,
           costDelta:
             c?.total_cost != null && u?.total_cost != null
               ? c.total_cost - u.total_cost

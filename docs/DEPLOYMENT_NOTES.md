@@ -1,73 +1,94 @@
-# Production Deployment & Security Notes
+# Deployment and Security Notes
 
-This document outlines deployment architectures, interface binding, network boundaries, and operational considerations for StockPilot AI.
+This document describes the deployment architecture, network boundaries, configuration parameters, and operational design of the StockPilot AI decision-support prototype.
 
----
+## 1. Network Boundaries and Service Interfaces
 
-## 1. Interface Binding & Network Boundaries
+The architecture consists of three local services and optional external managed dependencies:
+
+```
++-----------------------------+
+|      React 19 Client        |
+|  (Vite dev server: 5173)    |
++--------------+--------------+
+               | HTTP / REST (Firebase JWT Bearer Token)
+               v
++-----------------------------+
+|    Node.js Express Server   |
+|         (Port 8000)         |
++-------+--------------+------+
+        |              |
+        | HTTP POST    | Qdrant REST API
+        | X-Service-Key| (Port 6333)
+        v              v
++---------------+ +-----------+
+| Python Stats  | |  Qdrant   |
+|  (Port 8001)  | |  Vector   |
++---------------+ +-----------+
+```
 
 ### 1.1 Python Stats Service (`stats-service/`)
 
-- **Default Port**: `8000`
-- **Security Requirement**: The Python statistical engine processes numerical simulations and statistical forecasts. It relies on the shared secret `STATS_SERVICE_KEY` passed in the `X-Service-Key` header.
-- **Private Interface Binding**: The stats service MUST NEVER be bound to public interfaces (`0.0.0.0`) in production.
-  - In local or containerized setups: bind to `127.0.0.1` (`--host 127.0.0.1`).
-  - In cloud/cluster deployments (e.g., Kubernetes, AWS ECS, GCP Cloud Run): run within an isolated VPC, private subnet, or internal service mesh accessible only by the Node.js API server.
+- Default port: `8001` (set via Uvicorn command `--port 8001`).
+- Interface binding: In deployment, the stats service should bind to `127.0.0.1` or an internal virtual private network. It should not be exposed directly to the public internet.
+- Authentication: Enforces a shared secret passed in the `X-Service-Key` HTTP header. The secret is validated via constant-time string comparison (`hmac.compare_digest`) in `stats-service/app/security.py`. Requests with missing or non-matching keys receive HTTP 401 `UNAUTHENTICATED`.
+- Validation: Input bodies are parsed with Pydantic schemas configured with `extra="forbid"`. Malformed inputs return HTTP 422 `VALIDATION_ERROR`.
 
-### 1.2 Qdrant Vector Store
+### 1.2 Node.js API Gateway (`server/`)
 
-- **Security Requirement**: Qdrant stores vectorized semantic summaries of sessions, datasets, forecasts, policies, and simulations.
-- **Access Boundary**:
-  - Restrict access strictly to the Node.js backend using Qdrant API keys (`QDRANT_API_KEY`) and firewall rules.
-  - Bind Qdrant internal ports (`6333` HTTP, `6334` gRPC) to a private internal network or localhost.
-  - Never expose Qdrant to public internet traffic directly.
+- Default port: `8000` (configurable via `PORT` environment variable).
+- Entry point: `server/server.js` mounting routers from `server/src/app.js` at `/api/v1`.
+- Authentication: Firebase Admin SDK validates incoming `Authorization: Bearer <token>` headers (`server/src/middlewares/auth.middleware.js`). The verified `uid` is set to `res.locals.user.userId`.
+- Database: MongoDB via Mongoose (configured in `server/src/config/db.js`).
 
-### 1.3 MongoDB Database
+### 1.3 Qdrant Vector Engine (Optional)
 
-- **Security Requirement**: MongoDB holds multi-tenant operational data, metadata, and user assets.
-- **Access Boundary**:
-  - Configure MongoDB authentication (`SCRAM-SHA-256` or x.509 certificates).
-  - Whitelist only the IP addresses or VPC CIDR blocks of Node.js backend nodes.
-  - Enable TLS encryption in transit (`tls=true` in MongoDB connection URI).
+- Default port: `6333` (HTTP) / `6334` (gRPC).
+- Access: Node.js communicates via `@qdrant/js-client-rest`. If `QDRANT_API_KEY` is provided, requests include the `api-key` header.
+- Payload filtering: Point searches strictly include `{ key: "user_id", match: { value: userId } }` and `{ key: "session_id", match: { value: sessionId } }` to maintain tenant isolation.
 
-### 1.4 In-Process MongoDB-Backed Job Queue (`server/src/services/jobRunner.js`)
+## 2. In-Process MongoDB-Backed Job Runner
 
-- **Architecture**: Asynchronous background jobs (dataset ingestion, demand forecasting, inventory policy optimization, Monte Carlo simulation) run in-process within the Node.js server. Persistent job status, logs, progress, and outcomes are tracked in MongoDB via the `Job` collection (`server/src/models/job.model.js`).
-- **Concurrency Control**: Enforced using an in-process counting semaphore bounded by the `JOB_CONCURRENCY` environment setting (defaults to 2). When capacity is reached, excess jobs wait in an in-memory queue.
-- **Deduplication & Idempotency**: Jobs compute a SHA-256 hash of canonical JSON `(stage, sessionId, hashInput)`. A compound unique index on `{ sessionId, stage, inputHash, status }` in MongoDB prevents redundant overlapping executions for the same stage and inputs.
-- **Cancellation & Lifecycle**: Job cancellation is supported via cooperative `AbortController` signals (`runningControllers` map) and database flags (`cancelRequested`). When cancelled, active stage execution halts, transitions status to `cancelled`, and runs stage-specific `onCancelled` cleanup.
-- **Crash Recovery**: On server startup, `recoverInterruptedJobs()` detects orphaned `queued` or `running` jobs in MongoDB left by prior server crashes or restarts, marks them `failed` with error code `SERVER_RESTART` (retryable), and executes failure cleanup callbacks.
+Background tasks (validation, transformation, forecasting, optimization, simulation, portfolio) run asynchronously within the Node.js process (`server/src/services/jobRunner.js`):
 
----
+- **Concurrency**: Controlled by an in-memory counting semaphore capped by `JOB_CONCURRENCY` (default: 2, range: 1 to 8, defined in `server/src/config/env.js`). Excess jobs queue in an in-memory FIFO list.
+- **Deduplication**: When submitting a job, a SHA-256 hash is computed over `(stage, sessionId, hashInput)`. A MongoDB unique index on `{ sessionId, stage, inputHash, status }` prevents duplicate active runs.
+- **Cancellation**: Running jobs register an `AbortController`. The endpoint `POST /api/v1/jobs/:jobId/cancel` sets `cancelRequested: true` in MongoDB and calls `abort()`, invoking the stage-specific `onCancelled` handler.
+- **Crash recovery**: On server startup, `recoverInterruptedJobs()` queries `JobModel` for jobs with status `queued` or `running`. These are updated to `status: "failed"` with error code `SERVER_RESTART`, and their corresponding stage records are updated with `retryable: true`.
+- **Lean Mongoose queries**: Handlers constructing microservice request payloads (`simulationHandlers.js`, `replayHandlers.js`, `portfolioHandlers.js`, `optimizationHandlers.js`) use `.lean()` or plain object conversion so Mongoose internal fields (`_doc`, `$__parent`, `$isNew`) are not passed to Zod boundary parsers.
 
-## 2. Authentication & Multi-Tenancy Boundary
+## 3. Security and Multi-Tenancy
 
-- **Identity Verification**: Authentication is mediated by Firebase Authentication JWTs. The Node.js server extracts and validates the Bearer token via Firebase Admin SDK.
-- **Tenant Isolation**:
-  - The client-provided `userId` is never trusted. The validated token's `uid` is attached to `res.locals.user.userId`.
-  - Every MongoDB collection query filtering user data MUST filter by `{ userId }` (and `{ sessionId }` where appropriate).
-  - When a requested resource does not match `{ userId }`, the API responds strictly with HTTP 404 (`NOT_FOUND`), preventing existence probing or cross-tenant leaks.
-  - Vector similarity searches in Qdrant apply mandatory payload filters on `user_id` and `session_id` before computing semantic distance.
+- **User scoping**: All MongoDB queries on user data filter by `userId` (and `sessionId` where applicable). Missing records return HTTP 404 `NOT_FOUND` rather than HTTP 403 to avoid revealing the existence of other users' data.
+- **Credential hygiene**: `server/src/config/env.js` parses environment variables at boot. Secrets (`STATS_SERVICE_KEY`, `MONGODB_URI`, `LLM_API_KEY`, `EMBEDDING_API_KEY`, `QDRANT_API_KEY`) are not printed in logs. Error logging formats redact tokens and sensitive authorization headers.
+- **Cross-Origin-Opener-Policy (COOP)**: In `server/server.js`, Helmet is configured with `crossOriginOpenerPolicy: false`, and `client/vite.config.js` omits COOP headers. This allows Google OAuth popups (`signInWithPopup` via Firebase Auth) to communicate with the opener window and execute `window.close()` without browser COOP policy violation blocks.
 
----
+## 4. Rate Limiting
 
-## 3. Data Sanitization & Logging Hygiene
+Rate limiting is enforced in `server/src/middlewares/rateLimit.js` using in-memory token buckets:
 
-- **Sensitive Field Redaction**: `server/src/lib/logger.js` automatically strips authentication tokens, Authorization headers, and sensitive environment keys (`STATS_SERVICE_KEY`, `LLM_API_KEY`, `EMBEDDING_API_KEY`, `QDRANT_API_KEY`).
-- **No Data Leakage**: Raw CSV/Excel data rows are never logged. Error responses return sanitized error codes and human-readable messages without leaking stack traces or internal database errors in production.
+- General API requests (`RATE_LIMIT_GENERAL_PER_MINUTE`): default 300 requests/minute per IP/user.
+- Dataset uploads (`RATE_LIMIT_UPLOADS_PER_HOUR`): default 10 uploads/hour per user.
+- AI assistant prompts (`RATE_LIMIT_AI_PER_MINUTE`): default 20 requests/minute per user.
 
----
+Exceeded limits return HTTP 429 `RATE_LIMITED` with standard `RateLimit-*` and `Retry-After` headers.
 
-## 4. Rate Limiting & Denial of Service Protection
+## 5. Startup Procedure
 
-- **Layered Rate Limits**:
-  - Authenticated General API: 120 requests/minute.
-  - Dataset Uploads: 10 uploads/hour per user.
-  - AI Assistant & Vector Operations: 20 requests/minute per user.
-- **Standard Headers**: Emits standard IETF Draft-7 `RateLimit-*` headers and returns HTTP 429 with standard error envelope.
+To start the prototype locally without connection errors:
 
----
-
-## 5. Session Deletion & Cascade Policy
-
-- As detailed in `docs/DATA_HANDLING.md`, session deletions are permanent and cascade across Qdrant vectors, disk storage, and 10 MongoDB collections in a deterministic order.
+1. Start Python Stats Service:
+   ```bash
+   cd stats-service
+   .\.venv\Scripts\python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+   ```
+2. Start Node.js API Server:
+   ```bash
+   cd server
+   npm run dev
+   ```
+3. Start React Frontend Client:
+   ```bash
+   cd client
+   npm run dev
+   ```

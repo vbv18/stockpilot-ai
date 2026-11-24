@@ -6,6 +6,7 @@ import { AssumptionSetModel } from "../models/assumptionSet.model.js";
 import { ForecastRunModel } from "../models/forecastRun.model.js";
 import { OptimizationRunModel } from "../models/optimizationRun.model.js";
 import { registerJobHandler } from "./jobRunner.js";
+import { loadProcessedSeries } from "./processedSeries.js";
 import { setStage, transition } from "./sessionService.js";
 import { statsPost } from "./statsClient.js";
 import { scheduleReindex } from "./vector/scheduleReindex.js";
@@ -18,7 +19,7 @@ registerJobHandler("optimization", {
       _id: assumptionSetId,
       userId: ctx.userId,
       sessionId: ctx.sessionId,
-    });
+    }).lean();
     if (!assumptionSet) {
       throw new AppError("NOT_FOUND", "Assumption set not found");
     }
@@ -28,7 +29,7 @@ registerJobHandler("optimization", {
       userId: ctx.userId,
       sessionId: ctx.sessionId,
       status: "succeeded",
-    });
+    }).lean();
     if (!forecastRun) {
       throw new AppError("NOT_FOUND", "Active forecast run not found");
     }
@@ -64,6 +65,24 @@ registerJobHandler("optimization", {
         ? Object.fromEntries(assumptionSet.skus)
         : assumptionSet.skus || {};
 
+    let seriesPayload = null;
+    if (forecastRun.datasetId) {
+      try {
+        const rawSeries = await loadProcessedSeries(
+          ctx.userId,
+          forecastRun.datasetId,
+        );
+        seriesPayload = rawSeries.map((s) => ({
+          sku_id: s.skuId,
+          start_date: s.startDate,
+          values: s.values,
+        }));
+      } catch (err) {
+        // Non-blocking fallback if dataset loading encounters an issue
+        seriesPayload = null;
+      }
+    }
+
     const pyRequest = {
       skus: optimizeSkus,
       params: {
@@ -72,6 +91,7 @@ registerJobHandler("optimization", {
         bootstrap_seed: bootstrapSeed,
       },
       assumptions: skusMap,
+      ...(seriesPayload ? { series: seriesPayload } : {}),
     };
     PyOptimizeRequest.parse(pyRequest);
 

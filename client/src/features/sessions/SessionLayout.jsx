@@ -160,6 +160,17 @@ export default function SessionLayout() {
           </Link>
 
           <Link
+            to={`/sessions/${sessionId}/summary`}
+            className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors ${
+              activeSubpage === "summary"
+                ? "bg-slate-800 border-white/[0.16] text-white"
+                : "bg-slate-900/50 border-white/[0.08] text-slate-300 hover:bg-slate-800"
+            }`}
+          >
+            Summary
+          </Link>
+
+          <Link
             to={aiEligible ? `/ask-ai?sessionId=${sessionId}` : "#"}
             onClick={(e) => {
               if (!aiEligible) {

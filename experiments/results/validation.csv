@@ -1,0 +1,10 @@
+regime,policy,target_csl,achieved_csl,csl_gap,achieved_fill_rate,rop,eoq,mean_total_cost
+poisson,s_det,0.95,0.9145,-0.0355,0.9962,126,296,2630.14
+poisson,s_quant,0.95,0.9209,-0.0291,0.9965,127,296,2558.01
+poisson,s_emp,0.95,0.9209,-0.0291,0.9965,127,296,2558.01
+lognormal-skewed,s_det,0.95,0.9318,-0.0182,0.9917,175,319,4285.91
+lognormal-skewed,s_quant,0.95,0.7847,-0.1653,0.9751,134,319,8833.26
+lognormal-skewed,s_emp,0.95,0.9457,-0.0043,0.9936,184,319,3805.77
+lumpy,s_det,0.95,0.8753,-0.0747,0.9813,156,271,6054.91
+lumpy,s_quant,0.95,0.3663,-0.5837,0.8805,64,271,28446.33
+lumpy,s_emp,0.95,0.9149,-0.0351,0.9871,171,271,4801.71

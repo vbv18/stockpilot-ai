@@ -90,5 +90,6 @@ export const TransformationConfig = z
     dateFormat: DateFormat,
     skuIds: z.array(SkuId),
     seriesEndDate: IsoDate,
+    skuStatuses: z.record(SkuId, z.string()).optional(),
   })
   .strict();

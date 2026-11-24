@@ -9,9 +9,10 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { COPY } from "../../lib/copy.js";
-import { fmtInr, fmtNum, fmtPct } from "../../lib/format.js";
+import { fmtNum } from "../../lib/format.js";
 import {
   useGetOptimizationQuery,
+  useGetSimulationQuery,
   useStartOptimizationMutation,
 } from "../../lib/api.js";
 import { JobProgress } from "../jobs/JobProgress.jsx";
@@ -23,6 +24,11 @@ export default function OptimizationPage() {
   const navigate = useNavigate();
 
   const { data: optData, refetch } = useGetOptimizationQuery(session.id);
+  const activeSimId = session.activeSimulationRunId;
+  const { data: simData } = useGetSimulationQuery(
+    { id: session.id, simulationId: activeSimId },
+    { skip: !activeSimId },
+  );
 
   // Job tracker for optimization
   const [jobId, setJobId] = useState(() => {
@@ -60,6 +66,8 @@ export default function OptimizationPage() {
   const result = optData?.result;
   const risks = optData?.risk || [];
   const riskBySku = new Map(risks.map((r) => [r.skuId, r]));
+  const simSkus = simData?.result?.skus || [];
+  const simSkuBySku = new Map(simSkus.map((s) => [s.sku_id, s]));
 
   const okSkus = (result?.skus || []).filter((s) => s.status === "ok");
   const ineligibleSkus = (result?.skus || []).filter((s) => s.status !== "ok");
@@ -186,9 +194,7 @@ export default function OptimizationPage() {
               </span>
             </div>
             <div>
-              <span className="text-slate-500 text-[11px]">
-                Policy Mode:
-              </span>
+              <span className="text-slate-500 text-[11px]">Policy Mode:</span>
               <span className="font-mono text-indigo-300 ml-1.5 font-medium">
                 Per-SKU Parameters
               </span>
@@ -235,19 +241,19 @@ export default function OptimizationPage() {
                     Exp Lead Demand
                   </th>
                   <th scope="col" className="px-3 py-2.5 text-right font-sans">
-                    ROP Deterministic
+                    s_det (Deterministic)
                   </th>
                   <th
                     scope="col"
                     className="px-3 py-2.5 text-right font-sans text-sky-400"
                   >
-                    ROP Quantile
+                    s_quant (Quantile)
                   </th>
                   <th
                     scope="col"
                     className="px-3 py-2.5 text-right font-sans text-emerald-400"
                   >
-                    ROP Uncertainty-Aware
+                    s_emp (Empirical)
                   </th>
                   <th scope="col" className="px-3 py-2.5 text-right font-sans">
                     Gap (Emp - Det)
@@ -261,6 +267,52 @@ export default function OptimizationPage() {
                 {okSkus.map((sku) => {
                   const rk = riskBySku.get(sku.sku_id);
                   const gap = sku.rop_gap ?? 0;
+                  const sDet = sku.s_det ?? sku.rop_deterministic;
+                  const sQuant = sku.s_quant ?? sku.rop_quantile;
+                  const sEmp = sku.s_emp ?? sku.rop_uncertainty_aware;
+
+                  // Find best-cost policy either from simulated results or lowest inventory ROP
+                  const simSku = simSkuBySku.get(sku.sku_id);
+                  let bestPolicy = null;
+                  if (simSku) {
+                    const detC =
+                      simSku.s_det?.total_cost ??
+                      simSku.deterministic?.total_cost ??
+                      simSku.deterministic?.total_cost_mean;
+                    const quaC =
+                      simSku.s_quant?.total_cost ??
+                      simSku.quantile?.total_cost ??
+                      simSku.quantile?.total_cost_mean;
+                    const empC =
+                      simSku.s_emp?.total_cost ??
+                      simSku.uncertainty_aware?.total_cost ??
+                      simSku.uncertainty_aware?.total_cost_mean;
+                    const candidates = [
+                      { id: "s_det", cost: detC },
+                      { id: "s_quant", cost: quaC },
+                      { id: "s_emp", cost: empC },
+                    ].filter((c) => c.cost != null && !isNaN(c.cost));
+                    if (candidates.length > 0) {
+                      const minC = Math.min(...candidates.map((c) => c.cost));
+                      bestPolicy = candidates.find(
+                        (c) => Math.abs(c.cost - minC) < 1e-4,
+                      )?.id;
+                    }
+                  } else {
+                    const ropCandidates = [
+                      { id: "s_det", val: sDet },
+                      { id: "s_quant", val: sQuant },
+                      { id: "s_emp", val: sEmp },
+                    ].filter((c) => c.val != null && !isNaN(c.val));
+                    if (ropCandidates.length > 0) {
+                      const minVal = Math.min(
+                        ...ropCandidates.map((c) => c.val),
+                      );
+                      bestPolicy = ropCandidates.find(
+                        (c) => c.val === minVal,
+                      )?.id;
+                    }
+                  }
 
                   return (
                     <tr
@@ -284,13 +336,34 @@ export default function OptimizationPage() {
                         {fmtNum(sku.mu_l, 1)}
                       </td>
                       <td className="px-3 py-3 text-right font-semibold text-slate-200">
-                        {sku.rop_deterministic}
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>{sDet ?? "—"}</span>
+                          {bestPolicy === "s_det" && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              Best Cost
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-right font-semibold text-sky-300">
-                        {sku.rop_quantile ?? "—"}
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>{sQuant ?? "—"}</span>
+                          {bestPolicy === "s_quant" && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              Best Cost
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-right font-bold text-emerald-300">
-                        {sku.rop_uncertainty_aware}
+                        <div className="flex items-center justify-end gap-1.5">
+                          <span>{sEmp ?? "—"}</span>
+                          {bestPolicy === "s_emp" && (
+                            <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                              Best Cost
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-3 py-3 text-right">
                         <span

@@ -5,13 +5,16 @@ from dataclasses import dataclass, field
 from datetime import date, timedelta
 from typing import Optional
 
+import lightgbm
 import numpy as np
+import pandas as pd
 from statsforecast.models import AutoETS, SeasonalNaive
 
 from ..schemas import ForecastParams, IntervalBand, SkuForecast
 from .bootstrap import block_cutoffs, generate_paths
 from .classification import classify_demand
 from .evaluation import evaluate_sku_rolling
+from .global_lgbm import fit_predict_global_quantile
 from .intermittent import (
     collect_residual_blocks_croston,
     fit_predict_croston,
@@ -20,6 +23,13 @@ from .intermittent import (
 from .seeds import derive_seed
 
 log = logging.getLogger("stats.forecast")
+
+
+def naive_last(y: np.ndarray, h: int) -> np.ndarray:
+    """Repeat the last observed value for h horizon steps."""
+    if len(y) == 0:
+        return np.zeros(h, dtype=float)
+    return np.full(h, max(0.0, float(y[-1])), dtype=float)
 
 
 @dataclass
@@ -36,6 +46,8 @@ class SkuFit:
     mase_improvement: Optional[float] = None
     autoets_mean: Optional[np.ndarray] = None
     seasonal_naive_mean: Optional[np.ndarray] = None
+    naive_mean: Optional[np.ndarray] = None
+    global_lgbm_mean: Optional[np.ndarray] = None
     p10: Optional[np.ndarray] = None
     p50: Optional[np.ndarray] = None
     p90: Optional[np.ndarray] = None
@@ -143,7 +155,13 @@ def fit_intermittent_sku(
     return fit
 
 
-def fit_sku(sku_id: str, y: np.ndarray, params: ForecastParams) -> SkuFit:
+def fit_sku(
+    sku_id: str,
+    y: np.ndarray,
+    params: ForecastParams,
+    start_date: Optional[date] = None,
+    panel_df: Optional[pd.DataFrame] = None,
+) -> SkuFit:
     n = int(len(y))
     demand_class, adi, cv2 = classify_demand(y)
     if n < params.min_history:
@@ -158,7 +176,9 @@ def fit_sku(sku_id: str, y: np.ndarray, params: ForecastParams) -> SkuFit:
             demand_class=demand_class, adi=adi, cv2=cv2,
         )
 
-    eval_result = evaluate_sku_rolling(sku_id, y, params, demand_class)
+    eval_result = evaluate_sku_rolling(
+        sku_id, y, params, demand_class, start_date=start_date, panel_df=panel_df
+    )
     if eval_result is None:
         return SkuFit(
             sku_id, "insufficient_history", "not_computed",
@@ -170,6 +190,9 @@ def fit_sku(sku_id: str, y: np.ndarray, params: ForecastParams) -> SkuFit:
     mase_improvement = eval_result.mase_improvement
     chosen_blocks = eval_result.residual_blocks
     rng = np.random.default_rng(derive_seed(params.seed, sku_id, "bootstrap"))
+
+    global_lgbm_mean: Optional[np.ndarray] = None
+    naive_baseline_mean = naive_last(y, params.horizon)
 
     # Fit chosen model on the full historical series
     try:
@@ -183,6 +206,32 @@ def fit_sku(sku_id: str, y: np.ndarray, params: ForecastParams) -> SkuFit:
             model_spec = "SeasonalNaive"
             paths = generate_paths(fc_mean, chosen_blocks, params.n_bootstrap, params.horizon, params.block_size, rng)
             p10, p50, p90 = np.percentile(paths, [10, 50, 90], axis=0)
+        elif chosen_model == "Naive":
+            fc_mean = naive_baseline_mean
+            model_spec = "Naive"
+            paths = generate_paths(fc_mean, chosen_blocks, params.n_bootstrap, params.horizon, params.block_size, rng)
+            p10, p50, p90 = np.percentile(paths, [10, 50, 90], axis=0)
+        elif chosen_model == "GlobalLGBM":
+            # Native quantiles for GlobalLGBM
+            lgbm_seed = int(derive_seed(params.seed, sku_id, "global_lgbm_fit") % 2_147_483_647)
+            if panel_df is None:
+                start_dt = pd.to_datetime(start_date) if start_date is not None else pd.Timestamp("2024-01-01")
+                dates = pd.date_range(start=start_dt, periods=len(y), freq="D")
+                panel = pd.DataFrame({"sku_id": sku_id, "date": dates, "y": y})
+            else:
+                panel = panel_df
+            lgbm_res = fit_predict_global_quantile(panel, params.horizon, lgbm_seed)
+            if sku_id in lgbm_res:
+                p10 = lgbm_res[sku_id]["p10"]
+                p50 = lgbm_res[sku_id]["p50"]
+                p90 = lgbm_res[sku_id]["p90"]
+                fc_mean = p50
+            else:
+                fc_mean, _ = fit_predict(SeasonalNaive, y, params.horizon, params.season_length)
+                paths = generate_paths(fc_mean, chosen_blocks, params.n_bootstrap, params.horizon, params.block_size, rng)
+                p10, p50, p90 = np.percentile(paths, [10, 50, 90], axis=0)
+            global_lgbm_mean = fc_mean
+            model_spec = "GlobalLGBM"
         else:  # CrostonSBA
             fc_mean, _ = fit_predict_croston(y, params.horizon)
             model_spec = "CrostonSBA"
@@ -213,6 +262,8 @@ def fit_sku(sku_id: str, y: np.ndarray, params: ForecastParams) -> SkuFit:
         mase_improvement=mase_improvement,
         autoets_mean=fc_mean,
         seasonal_naive_mean=sn_mean,
+        naive_mean=naive_baseline_mean,
+        global_lgbm_mean=global_lgbm_mean,
         p10=p10,
         p50=p50,
         p90=p90,
@@ -246,8 +297,10 @@ def to_sku_forecast(fit: SkuFit, start_date: date, n_obs: int) -> SkuForecast:
         message=fit.message,
         n_observations=n_obs,
         forecast_start_date=(start_date + timedelta(days=n_obs)) if ok else None,
-        autoets_mean=fit.autoets_mean.tolist() if ok else None,
-        seasonal_naive_mean=fit.seasonal_naive_mean.tolist() if ok else None,
+        autoets_mean=fit.autoets_mean.tolist() if ok and fit.autoets_mean is not None else None,
+        seasonal_naive_mean=fit.seasonal_naive_mean.tolist() if ok and fit.seasonal_naive_mean is not None else None,
+        naive_mean=fit.naive_mean.tolist() if ok and fit.naive_mean is not None else None,
+        global_lgbm_mean=fit.global_lgbm_mean.tolist() if ok and fit.global_lgbm_mean is not None else None,
         intervals=intervals,
         residual_blocks=fit.residual_blocks.tolist() if intervals is not None and fit.residual_blocks is not None else None,
         residual_block_cutoffs=list(fit.residual_cutoffs) if intervals is not None and fit.residual_cutoffs is not None else None,

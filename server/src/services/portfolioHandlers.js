@@ -1,4 +1,7 @@
-import { PyPortfolioRequest, PyPortfolioResponse } from "../contracts/python.js";
+import {
+  PyPortfolioRequest,
+  PyPortfolioResponse,
+} from "../contracts/python.js";
 import { AppError } from "../lib/errors.js";
 import { AnalysisSessionModel } from "../models/analysisSession.model.js";
 import { AssumptionSetModel } from "../models/assumptionSet.model.js";
@@ -8,6 +11,7 @@ import { SimulationRunModel } from "../models/simulationRun.model.js";
 import { registerJobHandler } from "./jobRunner.js";
 import { setStage } from "./sessionService.js";
 import { statsPost } from "./statsClient.js";
+import { scheduleReindex } from "./vector/scheduleReindex.js";
 
 registerJobHandler("portfolio", {
   async run(ctx) {
@@ -24,7 +28,7 @@ registerJobHandler("portfolio", {
       userId: ctx.userId,
       sessionId: ctx.sessionId,
       status: "succeeded",
-    });
+    }).lean();
     if (!simRun || !simRun.sweep) {
       throw new AppError("NOT_FOUND", "Simulation sweep data not found");
     }
@@ -34,12 +38,14 @@ registerJobHandler("portfolio", {
       userId: ctx.userId,
       sessionId: ctx.sessionId,
       status: "succeeded",
-    });
+    }).lean();
     if (!optRun) {
       throw new AppError("NOT_FOUND", "Optimization run not found");
     }
 
-    const assumptionSet = await AssumptionSetModel.findById(assumptionSetId);
+    const assumptionSet = await AssumptionSetModel.findById(
+      assumptionSetId,
+    ).lean();
     if (!assumptionSet) {
       throw new AppError("NOT_FOUND", "Assumption set not found");
     }
@@ -75,13 +81,11 @@ registerJobHandler("portfolio", {
       const optSku = optMap.get(skuId);
       const unitCost = Number(skuAssumptions.unit_cost);
       const annualDemand = Number(
-        optSku?.annual_demand ??
-          ((optSku?.avg_daily_forecast ?? 0) * 365),
+        optSku?.annual_demand ?? (optSku?.avg_daily_forecast ?? 0) * 365,
       );
 
       // Prefer uncertainty_aware curve, fallback to deterministic
-      const points =
-        sweepObj.uncertainty_aware || sweepObj.deterministic || [];
+      const points = sweepObj.uncertainty_aware || sweepObj.deterministic || [];
       if (!Array.isArray(points) || points.length === 0) continue;
 
       const curve = points.map((p) => {
@@ -95,8 +99,7 @@ registerJobHandler("portfolio", {
           const eoqVal = optSku?.eoq ?? 1;
           const leadDemand =
             optSku?.mu_l ??
-            (skuAssumptions.lead_time_mean *
-              (optSku?.avg_daily_forecast ?? 1));
+            skuAssumptions.lead_time_mean * (optSku?.avg_daily_forecast ?? 1);
           avgInv = Math.max(0, ropVal - leadDemand + eoqVal / 2);
         }
         return {
@@ -168,6 +171,8 @@ registerJobHandler("portfolio", {
       finishedAt: new Date(),
       lastJobId: ctx.jobId,
     });
+
+    scheduleReindex(ctx.userId, ctx.sessionId, "portfolio");
 
     await ctx.setProgress(100, "Portfolio optimization complete");
     return { portfolioRunId: portRun._id.toString() };

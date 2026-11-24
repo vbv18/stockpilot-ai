@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import { COPY } from "../../lib/copy.js";
 import { fmtNum, fmtPct } from "../../lib/format.js";
-import { getDemandClassBadge } from "./ForecastPage.jsx";
+import { getDemandClassBadge } from "./demandClassBadge.js";
 
 export function ForecastChart({
   skuId,
@@ -87,14 +87,19 @@ export function ForecastChart({
       const p10 = skuEvaluation.intervals?.p10?.[i] ?? null;
       const p90 = skuEvaluation.intervals?.p90?.[i] ?? null;
       const hasBand = p10 !== null && p90 !== null;
+      const actualVal = skuEvaluation.actual[i];
+      const isInside = hasBand ? actualVal >= p10 && actualVal <= p90 : null;
 
       data.push({
         date: dt.toISOString().slice(0, 10),
-        actual: skuEvaluation.actual[i],
+        actual: actualVal,
+        isInside,
         autoets: skuEvaluation.autoets_mean?.[i] ?? null,
         seasonalNaive: skuEvaluation.seasonal_naive_mean?.[i] ?? null,
         bandBase: hasBand ? p10 : null,
         bandWidth: hasBand ? Math.max(0, p90 - p10) : null,
+        p10,
+        p90,
       });
     }
 
@@ -149,29 +154,55 @@ export function ForecastChart({
           </p>
         </div>
 
-        <div className="flex items-center rounded-xl bg-slate-900 border border-white/[0.08] p-1 self-start">
-          <button
-            type="button"
-            onClick={() => setView("forecast")}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-              view === "forecast"
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            Forecast
-          </button>
-          <button
-            type="button"
-            onClick={() => setView("holdout")}
-            className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
-              view === "holdout"
-                ? "bg-indigo-600 text-white shadow-sm"
-                : "text-slate-400 hover:text-slate-200"
-            }`}
-          >
-            Holdout Check
-          </button>
+        <div className="flex items-center gap-2">
+          {isHoldoutView && skuEvaluation?.interval_metrics && (
+            <span
+              className={`px-2.5 py-1 rounded-lg text-xs font-mono font-semibold border ${
+                (skuEvaluation.coverage_minus_nominal ??
+                  skuEvaluation.interval_metrics.coverage - 0.8) >= -0.05
+                  ? "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
+                  : "bg-amber-500/10 text-amber-300 border-amber-500/20"
+              }`}
+            >
+              Coverage: {fmtPct(skuEvaluation.interval_metrics.coverage, 1)}{" "}
+              (Nominal 80%,{" "}
+              {(skuEvaluation.coverage_minus_nominal ??
+                skuEvaluation.interval_metrics.coverage - 0.8) >= 0
+                ? "+"
+                : ""}
+              {fmtPct(
+                skuEvaluation.coverage_minus_nominal ??
+                  skuEvaluation.interval_metrics.coverage - 0.8,
+                1,
+              )}
+              )
+            </span>
+          )}
+
+          <div className="flex items-center rounded-xl bg-slate-900 border border-white/[0.08] p-1 self-start">
+            <button
+              type="button"
+              onClick={() => setView("forecast")}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                view === "forecast"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Forecast
+            </button>
+            <button
+              type="button"
+              onClick={() => setView("holdout")}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${
+                view === "holdout"
+                  ? "bg-indigo-600 text-white shadow-sm"
+                  : "text-slate-400 hover:text-slate-200"
+              }`}
+            >
+              Holdout Check
+            </button>
+          </div>
         </div>
       </div>
 
@@ -234,7 +265,24 @@ export function ForecastChart({
                 name="Actual"
                 stroke="#94a3b8"
                 strokeWidth={1.5}
-                dot={false}
+                dot={(props) => {
+                  const { cx, cy, payload } = props;
+                  if (cx == null || cy == null || payload?.actual == null)
+                    return null;
+                  const isInside = payload.isInside;
+                  const fill = isInside ? "#10b981" : "#ef4444";
+                  return (
+                    <circle
+                      key={`dot-${payload.date}`}
+                      cx={cx}
+                      cy={cy}
+                      r={3.5}
+                      fill={fill}
+                      stroke="#0f172a"
+                      strokeWidth={1.5}
+                    />
+                  );
+                }}
               />
             )}
             <Line
@@ -273,10 +321,23 @@ export function ForecastChart({
 
       {/* Legend & Notes */}
       <div className="flex items-center gap-4 text-[11px] text-slate-400 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <span className="w-2.5 h-0.5 bg-slate-400 inline-block" />
-          <span>{isHoldoutView ? "Actual" : "Observed"}</span>
-        </div>
+        {isHoldoutView ? (
+          <>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+              <span>Actual inside P10-P90</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block" />
+              <span>Actual outside P10-P90</span>
+            </div>
+          </>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <span className="w-2.5 h-0.5 bg-slate-400 inline-block" />
+            <span>Observed</span>
+          </div>
+        )}
         <div className="flex items-center gap-1.5">
           <span className="w-2.5 h-0.5 bg-indigo-500 inline-block" />
           <span>AutoETS forecast</span>
@@ -294,16 +355,23 @@ export function ForecastChart({
       {/* Holdout metrics table if holdout view */}
       {isHoldoutView && skuEvaluation && (
         <div className="mt-2 border-t border-white/[0.06] pt-3 overflow-x-auto">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-[11px] font-semibold text-slate-300">
-              8-Origin Rolling Evaluation & Selection
-            </span>
-            {skuEvaluation.chosen_model && (
-              <span className="text-[11px] font-sans text-indigo-300">
-                Chosen: <span className="font-semibold">{skuEvaluation.chosen_model}</span>
-                {skuEvaluation.mase_improvement > 0
-                  ? ` (+${fmtNum(skuEvaluation.mase_improvement, 1)}% vs Seasonal Naive)`
-                  : " (Baseline)"}
+          <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-slate-300">
+                8-Origin Rolling Evaluation & Selection
+              </span>
+              {skuEvaluation.chosen_model && (
+                <span className="px-1.5 py-0.5 rounded text-[10px] font-sans font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  Winner: {skuEvaluation.chosen_model}
+                </span>
+              )}
+            </div>
+            {skuEvaluation.baseline_improvement && (
+              <span className="text-[11px] font-mono text-emerald-400">
+                vs Naive: MAE +
+                {fmtNum(skuEvaluation.baseline_improvement.mae_pct, 1)}% | RMSE
+                +{fmtNum(skuEvaluation.baseline_improvement.rmse_pct, 1)}% |
+                WAPE +{fmtNum(skuEvaluation.baseline_improvement.wape_pct, 1)}%
               </span>
             )}
           </div>
@@ -326,10 +394,13 @@ export function ForecastChart({
                   MASE
                 </th>
                 <th scope="col" className="py-1 text-right">
+                  Pinball
+                </th>
+                <th scope="col" className="py-1 text-right">
                   Coverage (80%)
                 </th>
                 <th scope="col" className="py-1 text-center">
-                  Status
+                  Winner
                 </th>
               </tr>
             </thead>
@@ -338,21 +409,51 @@ export function ForecastChart({
                 {
                   key: "AutoETS",
                   name: "AutoETS",
-                  metrics: skuEvaluation.models?.AutoETS || skuEvaluation.autoets,
+                  metrics:
+                    skuEvaluation.models?.AutoETS || skuEvaluation.autoets,
                   isChosen: skuEvaluation.chosen_model === "AutoETS",
                 },
                 {
                   key: "SeasonalNaive",
                   name: "Seasonal Naive",
-                  metrics: skuEvaluation.models?.SeasonalNaive || skuEvaluation.seasonal_naive,
+                  metrics:
+                    skuEvaluation.models?.SeasonalNaive ||
+                    skuEvaluation.seasonal_naive,
                   isChosen: skuEvaluation.chosen_model === "SeasonalNaive",
                 },
-                ...(skuEvaluation.models?.CrostonSBA || skuEvaluation.croston_sba
+                ...(skuEvaluation.models?.GlobalLGBM ||
+                skuEvaluation.global_lgbm
+                  ? [
+                      {
+                        key: "GlobalLGBM",
+                        name: "Global LGBM",
+                        metrics:
+                          skuEvaluation.models?.GlobalLGBM ||
+                          skuEvaluation.global_lgbm,
+                        isChosen: skuEvaluation.chosen_model === "GlobalLGBM",
+                      },
+                    ]
+                  : []),
+                ...(skuEvaluation.models?.Naive || skuEvaluation.naive
+                  ? [
+                      {
+                        key: "Naive",
+                        name: "Naive",
+                        metrics:
+                          skuEvaluation.models?.Naive || skuEvaluation.naive,
+                        isChosen: skuEvaluation.chosen_model === "Naive",
+                      },
+                    ]
+                  : []),
+                ...(skuEvaluation.models?.CrostonSBA ||
+                skuEvaluation.croston_sba
                   ? [
                       {
                         key: "CrostonSBA",
                         name: "Croston SBA",
-                        metrics: skuEvaluation.models?.CrostonSBA || skuEvaluation.croston_sba,
+                        metrics:
+                          skuEvaluation.models?.CrostonSBA ||
+                          skuEvaluation.croston_sba,
                         isChosen: skuEvaluation.chosen_model === "CrostonSBA",
                       },
                     ]
@@ -369,8 +470,8 @@ export function ForecastChart({
                   <td className="py-1.5 px-2 font-sans flex items-center gap-1.5">
                     <span>{name}</span>
                     {isChosen && (
-                      <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-bold uppercase bg-indigo-500/30 text-indigo-200">
-                        Selected
+                      <span className="px-1.5 py-0.2 rounded text-[9px] font-sans font-bold uppercase bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                        Winner
                       </span>
                     )}
                   </td>
@@ -389,13 +490,24 @@ export function ForecastChart({
                     {fmtNum(metrics?.mase, 3)}
                   </td>
                   <td className="py-1.5 text-right">
-                    {fmtPct(metrics?.coverage ?? skuEvaluation.interval_metrics?.coverage, 1)}
+                    {fmtNum(metrics?.pinball_loss, 2)}
+                  </td>
+                  <td className="py-1.5 text-right">
+                    {fmtPct(
+                      metrics?.coverage ??
+                        skuEvaluation.interval_metrics?.coverage,
+                      1,
+                    )}
                   </td>
                   <td className="py-1.5 text-center font-sans">
                     {isChosen ? (
-                      <span className="text-[10px] text-indigo-400 font-semibold">Active</span>
+                      <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                        Winner
+                      </span>
                     ) : (
-                      <span className="text-[10px] text-slate-500">Candidate</span>
+                      <span className="text-[10px] text-slate-500">
+                        Candidate
+                      </span>
                     )}
                   </td>
                 </tr>

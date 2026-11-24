@@ -86,6 +86,8 @@ export const PySkuForecast = z
     forecast_start_date: IsoDate.nullable(),
     autoets_mean: nonNegArr.nullable(),
     seasonal_naive_mean: nonNegArr.nullable(),
+    naive_mean: nonNegArr.nullable().optional(),
+    global_lgbm_mean: nonNegArr.nullable().optional(),
     intervals: PyIntervalBand.nullable(),
     residual_blocks: z.array(finArr).nullable(),
     residual_block_cutoffs: z.array(z.number().int()).nullable(),
@@ -105,6 +107,30 @@ export const PyForecastResponse = z
   })
   .strict();
 
+export const PyBaselineImprovement = z
+  .object({
+    mae_pct: fin,
+    rmse_pct: fin,
+    wape_pct: fin,
+    coverage_minus_nominal: fin.nullable().optional(),
+  })
+  .strict();
+
+export const PyModelComparisonRow = z
+  .object({
+    sku_id: SkuId,
+    model: z.string(),
+    origin: z.number().int(),
+    mae: nonNeg,
+    rmse: nonNeg,
+    wape: nonNeg.nullable().optional(),
+    mase: fin.nullable().optional(),
+    pinball_loss: nonNeg,
+    coverage: nonNeg,
+    used_for_selection: z.boolean().optional(),
+  })
+  .strict();
+
 export const PyPointMetrics = z
   .object({
     mae: nonNeg,
@@ -115,6 +141,7 @@ export const PyPointMetrics = z
     sum_actual: nonNeg,
     mase: fin.nullable().optional(),
     coverage: nonNeg.nullable().optional(),
+    pinball_loss: nonNeg.nullable().optional(),
   })
   .strict();
 export const PyIntervalMetrics = z
@@ -133,14 +160,21 @@ export const PySkuEvaluation = z
     actual: nonNegArr.nullable(),
     autoets_mean: nonNegArr.nullable(),
     seasonal_naive_mean: nonNegArr.nullable(),
+    naive_mean: nonNegArr.nullable().optional(),
+    global_lgbm_mean: nonNegArr.nullable().optional(),
     intervals: PyIntervalBand.nullable(),
     autoets: PyPointMetrics.nullable(),
     seasonal_naive: PyPointMetrics.nullable(),
     croston_sba: PyPointMetrics.nullable().optional(),
+    naive: PyPointMetrics.nullable().optional(),
+    global_lgbm: PyPointMetrics.nullable().optional(),
     chosen_model: z.string().nullable().optional(),
     mase_improvement: fin.nullable().optional(),
     models: z.record(z.string(), PyPointMetrics).nullable().optional(),
     interval_metrics: PyIntervalMetrics.nullable(),
+    baseline_improvement: PyBaselineImprovement.nullable().optional(),
+    coverage_minus_nominal: fin.nullable().optional(),
+    model_comparison: z.array(PyModelComparisonRow).nullable().optional(),
     n_residual_blocks: z.number().int().nonnegative(),
     warnings: z.array(z.string()),
   })
@@ -161,6 +195,11 @@ export const PyEvaluateAggregate = z
     autoets: PyModelAggregate,
     seasonal_naive: PyModelAggregate,
     croston_sba: PyModelAggregate.nullable().optional(),
+    naive: PyModelAggregate.nullable().optional(),
+    global_lgbm: PyModelAggregate.nullable().optional(),
+    baseline_improvement: PyBaselineImprovement.nullable().optional(),
+    coverage_minus_nominal: fin.nullable().optional(),
+    model_comparison: z.array(PyModelComparisonRow).nullable().optional(),
     n_skus_with_intervals: z.number().int().nonnegative(),
     coverage_mean: fin.nullable(),
     mean_width_mean: fin.nullable(),
@@ -172,6 +211,8 @@ export const PyEvaluateResponse = z
     params: PyForecastParams,
     skus: z.array(PySkuEvaluation),
     aggregate: PyEvaluateAggregate,
+    baseline_improvement: PyBaselineImprovement.nullable().optional(),
+    model_comparison: z.array(PyModelComparisonRow).nullable().optional(),
   })
   .strict();
 
@@ -181,19 +222,28 @@ export const PyOptimizeSkuInput = z
     sku_id: SkuId,
     forecast_mean: z.array(nonNeg).min(1).max(56),
     residual_blocks: z.array(finArr).min(1).max(500),
-    residual_std: nonNeg,
+    residual_std: nonNeg.nullable().optional(),
+    intervals: PyIntervalBand.nullable().optional(),
   })
   .strict();
 
 export const PySkuAssumptions = z
   .object({
-    ordering_cost: z.number().finite().positive().max(1e9),
-    holding_cost_annual: z.number().finite().positive().max(1e9),
-    shortage_penalty: z.number().finite().positive().max(1e9),
+    sku_id: SkuId.optional(),
+    unit_cost: z.number().finite().positive().max(1e9),
+    order_cost: z.number().finite().positive().max(1e9),
+    holding_rate: z.number().finite().min(0).max(1),
+    shortage_cost: z.number().finite().positive().max(1e9),
     lead_time_mean: z.number().int().min(1).max(28),
     lead_time_std: z.number().finite().min(0).max(28).default(0),
-    service_level: z.number().finite().min(0.80).max(0.99),
-    unit_cost: z.number().finite().positive().max(1e9),
+    target_service_level: z.number().finite().min(0.8).max(0.99),
+    moq: z.number().int().min(1).default(1),
+    pack_size: z.number().int().min(1).default(1),
+    initial_stock: z.number().int().min(0).default(0),
+    ordering_cost: z.number().finite().positive().max(1e9).optional(),
+    holding_cost_annual: z.number().finite().positive().max(1e9).optional(),
+    shortage_penalty: z.number().finite().positive().max(1e9).optional(),
+    service_level: z.number().finite().min(0.8).max(0.99).optional(),
   })
   .strict();
 
@@ -205,11 +255,30 @@ export const PyOptimizeParams = z
   })
   .strict();
 
+export const PyDependencyPair = z
+  .object({
+    sku_i: z.string(),
+    sku_j: z.string(),
+    rho: z.number(),
+    relation: z.enum(["complementary", "substitute-like"]),
+  })
+  .strict();
+
+export const PyDemandDependency = z
+  .object({
+    sku_order: z.array(z.string()),
+    correlation_matrix: z.array(z.array(z.number())),
+    pairs: z.array(PyDependencyPair),
+    pooling_ratio: z.number(),
+  })
+  .strict();
+
 export const PyOptimizeRequest = z
   .object({
     skus: z.array(PyOptimizeSkuInput).min(1).max(100),
     params: PyOptimizeParams,
     assumptions: z.record(SkuId, PySkuAssumptions),
+    series: z.array(PySkuSeries).optional().nullable(),
   })
   .strict();
 
@@ -251,6 +320,9 @@ export const PySkuOptimization = z
     rop_quantile_raw: fin.nullable().optional(),
     rop_quantile: z.number().int().nullable().optional(),
     safety_stock_quantile: fin.nullable().optional(),
+    s_det: z.number().int().nullable().optional(),
+    s_quant: z.number().int().nullable().optional(),
+    s_emp: z.number().int().nullable().optional(),
     warnings: z.array(z.string()),
   })
   .strict();
@@ -260,6 +332,7 @@ export const PyOptimizeResponse = z
     run_meta: PyRunMeta,
     params: PyOptimizeParams,
     skus: z.array(PySkuOptimization),
+    dependency: PyDemandDependency.nullable().optional(),
   })
   .strict();
 
@@ -274,6 +347,9 @@ export const PySimulateSkuInput = z
     rop_deterministic: z.number().int().min(0),
     rop_uncertainty_aware: z.number().int().min(0),
     rop_quantile: z.number().int().min(0).optional(),
+    s_det: z.number().int().min(0).optional(),
+    s_quant: z.number().int().min(0).optional(),
+    s_emp: z.number().int().min(0).optional(),
   })
   .strict();
 
@@ -309,6 +385,13 @@ export const PyPolicyMetrics = z
     service_level_mean: fin,
     service_level_p05: fin,
     order_count_mean: fin,
+    fill_rate: fin.nullable().optional(),
+    csl: fin.nullable().optional(),
+    csl_mean: fin.nullable().optional(),
+    CSL: fin.nullable().optional(),
+    stockout_day_rate: fin.nullable().optional(),
+    total_cost: fin.nullable().optional(),
+    ltd_calibration: fin.nullable().optional(),
   })
   .strict();
 
@@ -317,6 +400,8 @@ export const PyPairedComparison = z
     mean_total_cost_diff: fin,
     share_scenarios_uncertainty_aware_cheaper: fin,
     share_scenarios_equal: fin,
+    ci_95_lower: fin.nullable().optional(),
+    ci_95_upper: fin.nullable().optional(),
   })
   .strict();
 
@@ -347,6 +432,9 @@ export const PySkuSimulation = z
     deterministic: PyPolicyMetrics,
     uncertainty_aware: PyPolicyMetrics,
     quantile: PyPolicyMetrics.optional().nullable(),
+    s_det: PyPolicyMetrics.optional().nullable(),
+    s_quant: PyPolicyMetrics.optional().nullable(),
+    s_emp: PyPolicyMetrics.optional().nullable(),
     paired: PyPairedComparison,
     sweep: PySkuSweep.optional().nullable(),
   })
@@ -363,6 +451,11 @@ export const PyAggregatePolicyMetrics = z
     stockout_rate_mean: fin,
     service_level: fin,
     order_count: fin,
+    fill_rate: fin.nullable().optional(),
+    csl: fin.nullable().optional(),
+    CSL: fin.nullable().optional(),
+    stockout_day_rate: fin.nullable().optional(),
+    ltd_calibration: fin.nullable().optional(),
   })
   .strict();
 
@@ -371,6 +464,9 @@ export const PySimulateAggregate = z
     deterministic: PyAggregatePolicyMetrics,
     uncertainty_aware: PyAggregatePolicyMetrics,
     quantile: PyAggregatePolicyMetrics.optional().nullable(),
+    s_det: PyAggregatePolicyMetrics.optional().nullable(),
+    s_quant: PyAggregatePolicyMetrics.optional().nullable(),
+    s_emp: PyAggregatePolicyMetrics.optional().nullable(),
     mean_total_cost_diff_sum: fin,
   })
   .strict();
@@ -391,6 +487,10 @@ export const PyReplayPolicyMetrics = z
     fill_rate: fin,
     total_cost: fin,
     stockout_days: z.number().int(),
+    csl: fin.nullable().optional(),
+    CSL: fin.nullable().optional(),
+    stockout_day_rate: fin.nullable().optional(),
+    ltd_calibration: fin.nullable().optional(),
   })
   .strict();
 
@@ -410,6 +510,9 @@ export const PySkuReplay = z
     quantile: PyReplayPolicyMetrics.nullable().optional(),
     det: PyReplayPolicyMetrics.nullable().optional(),
     unc: PyReplayPolicyMetrics.nullable().optional(),
+    s_det: PyReplayPolicyMetrics.nullable().optional(),
+    s_quant: PyReplayPolicyMetrics.nullable().optional(),
+    s_emp: PyReplayPolicyMetrics.nullable().optional(),
     message: z.string().nullable().optional(),
   })
   .strict();
@@ -442,6 +545,9 @@ export const PyReplayAggregate = z
     quantile: PyReplayPolicyMetrics.nullable().optional(),
     det: PyReplayPolicyMetrics.nullable().optional(),
     unc: PyReplayPolicyMetrics.nullable().optional(),
+    s_det: PyReplayPolicyMetrics.nullable().optional(),
+    s_quant: PyReplayPolicyMetrics.nullable().optional(),
+    s_emp: PyReplayPolicyMetrics.nullable().optional(),
   })
   .strict();
 
@@ -477,8 +583,14 @@ export const PyPortfolioSkuInput = z
 export const PyPortfolioRequest = z
   .object({
     skus: z.array(PyPortfolioSkuInput).min(1),
-    budget: fin.refine((v) => v > 0, "Must be positive").optional().nullable(),
-    capacity: fin.refine((v) => v > 0, "Must be positive").optional().nullable(),
+    budget: fin
+      .refine((v) => v > 0, "Must be positive")
+      .optional()
+      .nullable(),
+    capacity: fin
+      .refine((v) => v > 0, "Must be positive")
+      .optional()
+      .nullable(),
   })
   .strict();
 
@@ -491,6 +603,12 @@ export const PySkuPortfolioPlan = z
     inventory_investment: fin,
     total_cost: fin,
     turnover: fin,
+    greedy_service_level: fin.optional().nullable(),
+    exact_service_level: fin.optional().nullable(),
+    greedy_cost: fin.optional().nullable(),
+    exact_cost: fin.optional().nullable(),
+    greedy_rop: z.number().int().optional().nullable(),
+    exact_rop: z.number().int().optional().nullable(),
   })
   .strict();
 
@@ -517,5 +635,14 @@ export const PyPortfolioResponse = z
     capacity: fin.optional().nullable(),
     budget_usage_pct: fin.optional().nullable(),
     capacity_usage_pct: fin.optional().nullable(),
+    status: z.string().default("optimal"),
+    minimum_feasible_budget: fin.optional().nullable(),
+    greedy_cost: fin.optional().nullable(),
+    exact_cost: fin.optional().nullable(),
+    optimality_gap_pct: fin.optional().nullable(),
+    chosen_alphas: z.record(SkuId, fin).optional().nullable(),
+    shadow_price: fin.optional().nullable(),
+    exact_plan: PyPortfolioPlanSummary.optional().nullable(),
+    greedy_plan: PyPortfolioPlanSummary.optional().nullable(),
   })
   .strict();

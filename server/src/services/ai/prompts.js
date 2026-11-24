@@ -21,11 +21,12 @@ ${jsonSchema}
 
 Rules for the JSON:
 - "schemaVersion" must be "1.0".
-- "message": the explanation for the user (max 4000 chars). Use only numbers that appear in the evidence below.
+- "intent": one of "decision_support", "inventory_analysis", "recommendation_explanation", "what_if_analysis", "anomaly_investigation", "session_overview", "out_of_scope", "insufficient_evidence".
+- "message": concise explanation for the user (max 1500 chars). Use only numbers that appear in the evidence below.
 - "summary": one or two sentences.
-- "keyFindings": at most 12 items. Each "value" must be copied exactly from the evidence of its "evidenceId" (use unit "percent" only when stating a percentage; use "text" for non-numeric values). "provenance" must reflect what the number is (observed, forecast, assumption, calculated, simulated, what_if).
-- "evidence": the evidence ids you used, with the metric key names (dotted paths) you relied on.
-- "warnings": limitations, missing data, or hypotheses you could not verify.
-- "followUpSuggestions": up to 3 relevant next questions.
+- "keyFindings": between 2 and 4 key items. Each item must have "label", "value", "unit" ("units"|"inr"|"inr_per_unit"|"percent"|"fraction"|"days"|"count"|"ratio"|"text"|"none"), "skuId" (string or null), "evidenceId", and "provenance" ("observed"|"forecast"|"assumption"|"calculated"|"simulated"|"what_if").
+- "evidence": array of used evidence entries (max 4), each having "evidenceId", "metricKeys" (array of strings), and "note" (string or null).
+- "warnings": array of strings (e.g. []).
+- "followUpSuggestions": array of up to 3 relevant next questions.
 - Allowed evidence ids and what they hold:
 ${evidenceList}`;

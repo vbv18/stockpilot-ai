@@ -94,8 +94,12 @@ export function buildArtifactDocs(bundle) {
     );
   }
   if (portfolioRun) {
-    const b = portfolioRun.budget ? `${n(portfolioRun.budget)} budget` : "no budget limit";
-    const c = portfolioRun.capacity ? `${n(portfolioRun.capacity)} units capacity` : "no capacity limit";
+    const b = portfolioRun.budget
+      ? `${n(portfolioRun.budget)} budget`
+      : "no budget limit";
+    const c = portfolioRun.capacity
+      ? `${n(portfolioRun.capacity)} units capacity`
+      : "no capacity limit";
     overviewParts.push(
       `Portfolio run ${portfolioRun._id}: multi-SKU optimization with ${b}, ${c}.`,
     );
@@ -149,16 +153,48 @@ export function buildArtifactDocs(bundle) {
     const agg = forecastRun.result.evaluation.aggregate;
     const a = agg.autoets || {};
     const sn = agg.seasonal_naive || {};
+    const nv = agg.naive || {};
+    const gl = agg.global_lgbm || {};
+    const bi =
+      agg.baseline_improvement ||
+      forecastRun.result.evaluation.baseline_improvement ||
+      {};
+    const covDiff =
+      agg.coverage_minus_nominal ??
+      forecastRun.result.evaluation.coverage_minus_nominal ??
+      bi.coverage_minus_nominal ??
+      null;
     const im = agg.interval_metrics || {};
     const nSkus = forecastRun.result.skus
       ? Object.keys(forecastRun.result.skus).length
       : 0;
 
+    const baseImpStr =
+      bi.mae_pct != null
+        ? ` Baseline improvement vs Naive: MAE ${n(bi.mae_pct, 1)}%, RMSE ${n(bi.rmse_pct, 1)}%, WAPE ${n(bi.wape_pct, 1)}%.`
+        : "";
+    const naiveStr =
+      nv.mae_mean != null
+        ? ` Naive mean MAE ${n(nv.mae_mean)}, pooled WAPE ${n((nv.wape_pooled ?? 0) * 100, 1)}%.`
+        : "";
+    const glStr =
+      gl.mae_mean != null
+        ? ` Global LGBM mean MAE ${n(gl.mae_mean)}, pooled WAPE ${n((gl.wape_pooled ?? 0) * 100, 1)}%.`
+        : "";
+    const pinballStr =
+      a.pinball_loss_mean != null || a.pinball_loss != null
+        ? ` AutoETS mean pinball loss ${n(a.pinball_loss_mean ?? a.pinball_loss)}.`
+        : "";
+    const covDiffStr =
+      covDiff != null
+        ? ` (coverage minus nominal: ${n(covDiff * 100, 1)}%)`
+        : "";
+
     docs.push({
       artifactType: "forecast_aggregate",
       artifactId: forecastRun._id.toString(),
       skuId: null,
-      text: `Forecast evaluation aggregate (last 28 days holdout): AutoETS mean MAE ${n(a.mae)}, mean RMSE ${n(a.rmse)}, pooled WAPE ${n((a.wape ?? 0) * 100, 1)}%; Seasonal Naive mean MAE ${n(sn.mae)}, mean RMSE ${n(sn.rmse)}, pooled WAPE ${n((sn.wape ?? 0) * 100, 1)}%. P10-P90 interval coverage averages ${n((im.coverage_p10_p90 ?? 0) * 100, 1)}% (nominal 80%) with mean width ${n(im.mean_width)} units across ${nSkus} SKUs.`.slice(
+      text: `Forecast evaluation aggregate (last 28 days holdout): AutoETS mean MAE ${n(a.mae ?? a.mae_mean)}, mean RMSE ${n(a.rmse ?? a.rmse_mean)}, pooled WAPE ${n((a.wape ?? a.wape_pooled ?? 0) * 100, 1)}%; Seasonal Naive mean MAE ${n(sn.mae ?? sn.mae_mean)}, mean RMSE ${n(sn.rmse ?? sn.rmse_mean)}, pooled WAPE ${n((sn.wape ?? sn.wape_pooled ?? 0) * 100, 1)}%.${naiveStr}${glStr}${pinballStr}${baseImpStr} P10-P90 interval coverage averages ${n((agg.coverage_mean ?? im.coverage_p10_p90 ?? 0) * 100, 1)}% (nominal 80%)${covDiffStr} with mean width ${n(agg.mean_width_mean ?? im.mean_width)} units across ${nSkus} SKUs.`.slice(
         0,
         1500,
       ),
@@ -167,9 +203,7 @@ export function buildArtifactDocs(bundle) {
 
   // 4. forecast_sku & 5. evaluation_sku
   const rawFcSkus =
-    forecastRun?.result?.forecast?.skus ||
-    forecastRun?.result?.skus ||
-    null;
+    forecastRun?.result?.forecast?.skus || forecastRun?.result?.skus || null;
   if (forecastRun && rawFcSkus) {
     const forecastRunId = forecastRun._id.toString();
     const skusMap = Array.isArray(rawFcSkus)
@@ -262,6 +296,13 @@ export function buildArtifactDocs(bundle) {
       if (evalData) {
         const ae = evalData.autoets || {};
         const sn = evalData.seasonal_naive || {};
+        const nv = evalData.naive || {};
+        const gl = evalData.global_lgbm || {};
+        const bi = evalData.baseline_improvement || {};
+        const covDiff =
+          evalData.coverage_minus_nominal ??
+          evalData.baseline_improvement?.coverage_minus_nominal ??
+          null;
         const im = evalData.interval_metrics || {};
         const wapeAe =
           ae.wape !== null && ae.wape !== undefined
@@ -271,17 +312,37 @@ export function buildArtifactDocs(bundle) {
           sn.wape !== null && sn.wape !== undefined
             ? `${n(sn.wape * 100, 1)}%`
             : "WAPE n/a (zero actual demand)";
+        const covVal = im.coverage ?? im.coverage_p10_p90;
         const cov =
-          im.coverage_p10_p90 !== null && im.coverage_p10_p90 !== undefined
-            ? `${n(im.coverage_p10_p90 * 100, 1)}%`
+          covVal !== null && covVal !== undefined
+            ? `${n(covVal * 100, 1)}%`
             : "n/a";
         const width = n(im.mean_width);
+
+        const pinballVal =
+          ae.pinball_loss ?? evalData.model_comparison?.[0]?.pinball_loss;
+        const pinballStr =
+          pinballVal != null ? `, pinball loss ${n(pinballVal)}` : "";
+        const baseImpStr =
+          bi.mae_pct != null
+            ? `; Baseline improvement vs Naive: MAE ${n(bi.mae_pct, 1)}%, RMSE ${n(bi.rmse_pct, 1)}%, WAPE ${n(bi.wape_pct, 1)}%`
+            : "";
+        const covDiffStr =
+          covDiff != null
+            ? ` (coverage minus nominal: ${n(covDiff * 100, 1)}%)`
+            : "";
+        const naiveStr =
+          nv.mae != null ? `; Naive MAE ${n(nv.mae)}, RMSE ${n(nv.rmse)}` : "";
+        const glStr =
+          gl.mae != null
+            ? `; Global LGBM MAE ${n(gl.mae)}, RMSE ${n(gl.rmse)}`
+            : "";
 
         docs.push({
           artifactType: "evaluation_sku",
           artifactId: forecastRunId,
           skuId,
-          text: `Evaluation for SKU ${skuId} (8-origin rolling backtest): Chosen model ${evalData.chosen_model || "AutoETS"} (${evalData.mase_improvement ? n(evalData.mase_improvement, 1) + "% vs SeasonalNaive" : "baseline"}). AutoETS MAE ${n(ae.mae)}, RMSE ${n(ae.rmse)}, MASE ${n(ae.mase)}, ${wapeAe}; Seasonal Naive MAE ${n(sn.mae)}, RMSE ${n(sn.rmse)}, MASE ${n(sn.mase)}, ${wapeSn}; P10-P90 coverage ${cov} (nominal 80%), mean width ${width} units.`.slice(
+          text: `Evaluation for SKU ${skuId} (8-origin rolling backtest): Chosen model ${evalData.chosen_model || "AutoETS"} (${evalData.mase_improvement ? n(evalData.mase_improvement, 1) + "% vs SeasonalNaive" : "baseline"}). AutoETS MAE ${n(ae.mae)}, RMSE ${n(ae.rmse)}, MASE ${n(ae.mase)}, ${wapeAe}${pinballStr}; Seasonal Naive MAE ${n(sn.mae)}, RMSE ${n(sn.rmse)}, MASE ${n(sn.mase)}, ${wapeSn}${naiveStr}${glStr}${baseImpStr}; P10-P90 coverage ${cov} (nominal 80%)${covDiffStr}, mean width ${width} units.`.slice(
             0,
             1500,
           ),
@@ -368,15 +429,15 @@ export function buildArtifactDocs(bundle) {
         riskCounts[risk.level] = (riskCounts[risk.level] || 0) + 1;
       }
 
+      const sDet = skuOpt.s_det ?? skuOpt.rop_deterministic ?? "n/a";
+      const sQuant = skuOpt.s_quant ?? skuOpt.rop_quantile ?? "n/a";
+      const sEmp = skuOpt.s_emp ?? skuOpt.rop_uncertainty_aware ?? "n/a";
       const eoq = skuOpt.eoq ?? "n/a";
       const D = n(skuOpt.annual_demand);
       const muL = n(skuOpt.ltd?.mean);
-      const ropD = skuOpt.rop_deterministic ?? "n/a";
       const ssD = n(skuOpt.normal_ss);
       const sigL = n(skuOpt.sigma_l);
       const zVal = n(skuOpt.z_value);
-      const ropQ = skuOpt.rop_quantile ?? "n/a";
-      const ropU = skuOpt.rop_uncertainty_aware ?? "n/a";
       const ssU = n(skuOpt.bootstrap_ss);
       const gap = skuOpt.rop_gap ?? 0;
       totalGaps.push(Math.abs(gap));
@@ -401,7 +462,7 @@ export function buildArtifactDocs(bundle) {
         artifactType: "optimization_sku",
         artifactId: optRunId,
         skuId,
-        text: `SKU ${skuId}: EOQ ${eoq} units (annual demand ${D}). Expected lead-time demand ${muL} units. Deterministic ROP ${ropD} (safety stock ${ssD}, sigma_L ${sigL}, z ${zVal}). Quantile ROP ${ropQ}. Uncertainty-aware ROP ${ropU} (safety stock ${ssU}); gap ${gap} units. Lead-time demand P10/P50/P90: ${a}/${b}/${c}, skewness ${s}. Risk level ${rLevel}; flags: ${flagsStr}. Warnings: ${warningsStr}.`.slice(
+        text: `SKU ${skuId}: EOQ ${eoq} units (annual demand ${D}). Expected lead-time demand ${muL} units. Three policies: s_det ${sDet} (safety stock ${ssD}, sigma_L ${sigL}, z ${zVal}), s_quant ${sQuant}, s_emp ${sEmp} (safety stock ${ssU}); gap ${gap} units. Lead-time demand P10/P50/P90: ${a}/${b}/${c}, skewness ${s}. Risk level ${rLevel}; flags: ${flagsStr}. Warnings: ${warningsStr}.`.slice(
           0,
           1500,
         ),
@@ -414,12 +475,16 @@ export function buildArtifactDocs(bundle) {
         ? totalGaps.reduce((a, b) => a + b, 0) / totalGaps.length
         : 0;
     const maxGap = totalGaps.length > 0 ? Math.max(...totalGaps) : 0;
+    const dep = optimizationRun.result.dependency;
+    const depStr = dep
+      ? ` Multi-SKU dependency: demand co-movement pooling ratio ${n(dep.pooling_ratio, 3)}, ${dep.pairs?.length ?? 0} correlation pairs with |rho| >= 0.3.`
+      : "";
 
     docs.push({
       artifactType: "optimization_aggregate",
       artifactId: optRunId,
       skuId: null,
-      text: `Optimization aggregate: ${eligibleCount} eligible SKUs, ${ineligibleCount} ineligible SKUs. Risk distribution: ${riskCounts.low} low, ${riskCounts.medium} medium, ${riskCounts.high} high risk. Mean absolute ROP gap: ${n(meanGap)} units, max absolute ROP gap: ${n(maxGap)} units.`.slice(
+      text: `Optimization aggregate: ${eligibleCount} eligible SKUs, ${ineligibleCount} ineligible SKUs. Risk distribution: ${riskCounts.low} low, ${riskCounts.medium} medium, ${riskCounts.high} high risk. Mean absolute ROP gap: ${n(meanGap)} units, max absolute ROP gap: ${n(maxGap)} units.${depStr}`.slice(
         0,
         1500,
       ),
@@ -435,19 +500,25 @@ export function buildArtifactDocs(bundle) {
     const simSkus = simulationRun.result.skus || {};
 
     for (const [skuId, simData] of Object.entries(simSkus)) {
-      const d = simData.deterministic || {};
-      const u = simData.uncertainty_aware || {};
+      const d = simData.deterministic || simData.s_det || {};
+      const u = simData.uncertainty_aware || simData.s_emp || {};
+      const q = simData.quantile || simData.s_quant || {};
       const diff = n(simData.mean_total_cost_diff);
       const pctCheaper = n(
         (simData.fraction_uncertainty_cheaper ?? 0) * 100,
         1,
       );
 
+      const qStr =
+        q.mean_total_cost != null || q.total_cost != null
+          ? ` Quantile policy: mean total cost ${n(q.mean_total_cost ?? q.total_cost)} INR (ordering ${n(q.mean_ordering_cost ?? q.ordering_cost)}, holding ${n(q.mean_holding_cost ?? q.holding_cost)}, shortage ${n(q.mean_shortage_cost ?? q.shortage_cost)}), service level ${n((q.service_level ?? 0) * 100, 1)}%, stockout units ${n(q.mean_stockout_units ?? q.stockout_units)}.`
+          : "";
+
       docs.push({
         artifactType: "simulation_sku",
         artifactId: simRunId,
         skuId,
-        text: `Simulation for SKU ${skuId} (${sc} scenarios, ${hz} days, seed ${sd}). Deterministic policy: mean total cost ${n(d.mean_total_cost)} INR (ordering ${n(d.mean_ordering_cost)}, holding ${n(d.mean_holding_cost)}, shortage ${n(d.mean_shortage_cost)}), service level ${n((d.service_level ?? 0) * 100, 1)}%, stockout units ${n(d.mean_stockout_units)}, average inventory ${n(d.mean_ending_inventory)}, orders ${n(d.mean_orders_placed)}. Uncertainty-aware policy: mean total cost ${n(u.mean_total_cost)} INR (ordering ${n(u.mean_ordering_cost)}, holding ${n(u.mean_holding_cost)}, shortage ${n(u.mean_shortage_cost)}), service level ${n((u.service_level ?? 0) * 100, 1)}%, stockout units ${n(u.mean_stockout_units)}, average inventory ${n(u.mean_ending_inventory)}, orders ${n(u.mean_orders_placed)}. Paired mean cost difference (uncertainty-aware minus deterministic) ${diff} INR; uncertainty-aware cheaper in ${pctCheaper}% of scenarios.`.slice(
+        text: `Simulation for SKU ${skuId} (${sc} scenarios, ${hz} days, seed ${sd}). Deterministic policy: mean total cost ${n(d.mean_total_cost ?? d.total_cost)} INR (ordering ${n(d.mean_ordering_cost ?? d.ordering_cost)}, holding ${n(d.mean_holding_cost ?? d.holding_cost)}, shortage ${n(d.mean_shortage_cost ?? d.shortage_cost)}), service level ${n((d.service_level ?? 0) * 100, 1)}%, stockout units ${n(d.mean_stockout_units ?? d.stockout_units)}, average inventory ${n(d.mean_ending_inventory ?? d.avg_inventory)}, orders ${n(d.mean_orders_placed ?? d.order_count)}.${qStr} Uncertainty-aware policy: mean total cost ${n(u.mean_total_cost ?? u.total_cost)} INR (ordering ${n(u.mean_ordering_cost ?? u.ordering_cost)}, holding ${n(u.mean_holding_cost ?? u.holding_cost)}, shortage ${n(u.mean_shortage_cost ?? u.shortage_cost)}), service level ${n((u.service_level ?? 0) * 100, 1)}%, stockout units ${n(u.mean_stockout_units ?? u.stockout_units)}, average inventory ${n(u.mean_ending_inventory ?? u.avg_inventory)}, orders ${n(u.mean_orders_placed ?? u.order_count)}. Paired mean cost difference (uncertainty-aware minus deterministic) ${diff} INR; uncertainty-aware cheaper in ${pctCheaper}% of scenarios.`.slice(
           0,
           1500,
         ),
@@ -456,15 +527,21 @@ export function buildArtifactDocs(bundle) {
 
     if (simulationRun.result.aggregate) {
       const agg = simulationRun.result.aggregate;
-      const d = agg.deterministic || {};
-      const u = agg.uncertainty_aware || {};
+      const d = agg.deterministic || agg.s_det || {};
+      const u = agg.uncertainty_aware || agg.s_emp || {};
+      const q = agg.quantile || agg.s_quant || {};
       const diffSum = n(agg.mean_total_cost_diff_sum);
+
+      const qStr =
+        q.mean_total_cost != null || q.total_cost != null
+          ? ` Quantile policy total mean cost ${n(q.mean_total_cost ?? q.total_cost)} INR (ordering ${n(q.mean_ordering_cost ?? q.ordering_cost)}, holding ${n(q.mean_holding_cost ?? q.holding_cost)}, shortage ${n(q.mean_shortage_cost ?? q.shortage_cost)}), service level ${n((q.service_level ?? 0) * 100, 1)}%, stockout units ${n(q.mean_stockout_units ?? q.stockout_units)}.`
+          : "";
 
       docs.push({
         artifactType: "simulation_aggregate",
         artifactId: simRunId,
         skuId: null,
-        text: `Simulation aggregate (${sc} scenarios, ${hz} days, seed ${sd}): Deterministic policy total mean cost ${n(d.mean_total_cost)} INR (ordering ${n(d.mean_ordering_cost)}, holding ${n(d.mean_holding_cost)}, shortage ${n(d.mean_shortage_cost)}), service level ${n((d.service_level ?? 0) * 100, 1)}%, stockout units ${n(d.mean_stockout_units)}. Uncertainty-aware policy total mean cost ${n(u.mean_total_cost)} INR (ordering ${n(u.mean_ordering_cost)}, holding ${n(u.mean_holding_cost)}, shortage ${n(u.mean_shortage_cost)}), service level ${n((u.service_level ?? 0) * 100, 1)}%, stockout units ${n(u.mean_stockout_units)}. Aggregate paired mean cost difference sum (uncertainty-aware minus deterministic): ${diffSum} INR.`.slice(
+        text: `Simulation aggregate (${sc} scenarios, ${hz} days, seed ${sd}): Deterministic policy total mean cost ${n(d.mean_total_cost ?? d.total_cost)} INR (ordering ${n(d.mean_ordering_cost ?? d.ordering_cost)}, holding ${n(d.mean_holding_cost ?? d.holding_cost)}, shortage ${n(d.mean_shortage_cost ?? d.shortage_cost)}), service level ${n((d.service_level ?? 0) * 100, 1)}%, stockout units ${n(d.mean_stockout_units ?? d.stockout_units)}.${qStr} Uncertainty-aware policy total mean cost ${n(u.mean_total_cost ?? u.total_cost)} INR (ordering ${n(u.mean_ordering_cost ?? u.ordering_cost)}, holding ${n(u.mean_holding_cost ?? u.holding_cost)}, shortage ${n(u.mean_shortage_cost ?? u.shortage_cost)}), service level ${n((u.service_level ?? 0) * 100, 1)}%, stockout units ${n(u.mean_stockout_units ?? u.stockout_units)}. Aggregate paired mean cost difference sum (uncertainty-aware minus deterministic): ${diffSum} INR.`.slice(
           0,
           1500,
         ),
@@ -478,11 +555,17 @@ export function buildArtifactDocs(bundle) {
     const agg = ev.aggregate || {};
     const autoets = agg.autoets || {};
     const snaive = agg.seasonal_naive || {};
+    const nv = agg.naive || {};
+    const gl = agg.global_lgbm || {};
     const croston = agg.croston_sba || {};
+    const bi = agg.baseline_improvement || ev.baseline_improvement || {};
+    const covDiff =
+      agg.coverage_minus_nominal ??
+      ev.coverage_minus_nominal ??
+      bi.coverage_minus_nominal ??
+      null;
     const rawSkus = ev.skus || {};
-    const skusList = Array.isArray(rawSkus)
-      ? rawSkus
-      : Object.values(rawSkus);
+    const skusList = Array.isArray(rawSkus) ? rawSkus : Object.values(rawSkus);
     const chosenCounts = {};
     for (const s of skusList) {
       if (s.chosen_model) {
@@ -494,11 +577,32 @@ export function buildArtifactDocs(bundle) {
         .map(([m, c]) => `${m}: ${c}`)
         .join(", ") || "n/a";
 
+    const baseImpStr =
+      bi.mae_pct != null
+        ? ` Baseline improvement vs Naive: MAE ${n(bi.mae_pct, 1)}%, RMSE ${n(bi.rmse_pct, 1)}%, WAPE ${n(bi.wape_pct, 1)}%.`
+        : "";
+    const naiveStr =
+      nv.mae_mean != null
+        ? ` Naive pooled WAPE ${n((nv.wape_pooled ?? 0) * 100, 1)}%, mean MAE ${n(nv.mae_mean)}, mean RMSE ${n(nv.rmse_mean)}.`
+        : "";
+    const glStr =
+      gl.mae_mean != null
+        ? ` Global LGBM pooled WAPE ${n((gl.wape_pooled ?? 0) * 100, 1)}%, mean MAE ${n(gl.mae_mean)}, mean RMSE ${n(gl.rmse_mean)}.`
+        : "";
+    const pinballStr =
+      autoets.pinball_loss_mean != null
+        ? ` Mean pinball loss: ${n(autoets.pinball_loss_mean)}.`
+        : "";
+    const covDiffStr =
+      covDiff != null
+        ? ` (coverage minus nominal: ${n(covDiff * 100, 1)}%)`
+        : "";
+
     docs.push({
       artifactType: "backtest_aggregate",
       artifactId: forecastRun._id.toString(),
       skuId: null,
-      text: `Rolling backtest model comparison aggregate (8-origin evaluation across ${skusList.length} SKUs): Chosen model distribution: ${chosenSummary}. AutoETS pooled WAPE ${n((autoets.wape_pooled ?? 0) * 100, 1)}%, mean MAE ${n(autoets.mae_mean)}, mean RMSE ${n(autoets.rmse_mean)}, mean MASE ${n(autoets.mase_mean)}. Seasonal Naive pooled WAPE ${n((snaive.wape_pooled ?? 0) * 100, 1)}%, mean MAE ${n(snaive.mae_mean)}, mean RMSE ${n(snaive.rmse_mean)}, mean MASE ${n(snaive.mase_mean)}. Croston SBA pooled WAPE ${n((croston.wape_pooled ?? 0) * 100, 1)}%, mean MAE ${n(croston.mae_mean)}, mean RMSE ${n(croston.rmse_mean)}. Interval coverage: nominal 80%, mean coverage ${n((agg.coverage_mean ?? 0) * 100, 1)}%, mean width ${n(agg.mean_width_mean)} units.`.slice(
+      text: `Rolling backtest model comparison aggregate (8-origin evaluation across ${skusList.length} SKUs): Chosen model distribution: ${chosenSummary}. AutoETS pooled WAPE ${n((autoets.wape_pooled ?? 0) * 100, 1)}%, mean MAE ${n(autoets.mae_mean)}, mean RMSE ${n(autoets.rmse_mean)}, mean MASE ${n(autoets.mase_mean)}. Seasonal Naive pooled WAPE ${n((snaive.wape_pooled ?? 0) * 100, 1)}%, mean MAE ${n(snaive.mae_mean)}, mean RMSE ${n(snaive.rmse_mean)}, mean MASE ${n(snaive.mase_mean)}.${naiveStr}${glStr} Croston SBA pooled WAPE ${n((croston.wape_pooled ?? 0) * 100, 1)}%, mean MAE ${n(croston.mae_mean)}, mean RMSE ${n(croston.rmse_mean)}.${pinballStr}${baseImpStr} Interval coverage: nominal 80%, mean coverage ${n((agg.coverage_mean ?? 0) * 100, 1)}%${covDiffStr}, mean width ${n(agg.mean_width_mean)} units.`.slice(
         0,
         1500,
       ),
@@ -516,11 +620,25 @@ export function buildArtifactDocs(bundle) {
     const uPlan = pr.unconstrained_plan || {};
     const cPlan = pr.constrained_plan || {};
 
+    const exactStr =
+      pr.exact_cost != null
+        ? ` Exact cost ${n(pr.exact_cost)} INR vs greedy cost ${n(pr.greedy_cost)} INR, optimality gap ${n(pr.optimality_gap_pct, 2)}%.`
+        : "";
+    const shadowPriceVal = pr.shadow_price ?? pr.budget_shadow_price;
+    const shadowStr =
+      shadowPriceVal != null
+        ? ` Shadow price: ${n(shadowPriceVal)} cost change per unit budget (central difference at B*0.99 and B*1.01).`
+        : "";
+    const statusStr =
+      pr.status && pr.status !== "optimal"
+        ? ` Status: ${pr.status}${pr.minimum_feasible_budget != null ? ` (minimum feasible budget ${n(pr.minimum_feasible_budget)} INR)` : ""}.`
+        : "";
+
     docs.push({
       artifactType: "portfolio_aggregate",
       artifactId: portRunId,
       skuId: null,
-      text: `Portfolio optimization aggregate: Budget ${n(pr.budget)} INR (usage ${n(pr.budget_usage_pct, 1)}%), Capacity ${n(pr.capacity)} units (usage ${n(pr.capacity_usage_pct, 1)}%). Binding constraints: ${binding}. Budget shadow price: ${n(pr.budget_shadow_price)} cost decrease per unit budget. Unconstrained plan: total cost ${n(uPlan.total_cost)} INR, inventory investment ${n(uPlan.total_inventory_investment)} INR, total units ${n(uPlan.total_units)}, avg service level ${n((uPlan.avg_service_level ?? 0) * 100, 1)}%, turnover ${n(uPlan.turnover)}. Constrained plan: total cost ${n(cPlan.total_cost)} INR, inventory investment ${n(cPlan.total_inventory_investment)} INR, total units ${n(cPlan.total_units)}, avg service level ${n((cPlan.avg_service_level ?? 0) * 100, 1)}%, turnover ${n(cPlan.turnover)}. Total cost delta (constrained minus unconstrained): ${n(pr.total_cost_delta)} INR.`.slice(
+      text: `Portfolio optimization aggregate: Budget ${n(pr.budget)} INR (usage ${n(pr.budget_usage_pct, 1)}%), Capacity ${n(pr.capacity)} units (usage ${n(pr.capacity_usage_pct, 1)}%).${exactStr}${shadowStr}${statusStr} Binding constraints: ${binding}. Unconstrained plan: total cost ${n(uPlan.total_cost)} INR, inventory investment ${n(uPlan.total_inventory_investment)} INR, total units ${n(uPlan.total_units)}, avg service level ${n((uPlan.avg_service_level ?? 0) * 100, 1)}%, turnover ${n(uPlan.turnover)}. Constrained plan: total cost ${n(cPlan.total_cost)} INR, inventory investment ${n(cPlan.total_inventory_investment)} INR, total units ${n(cPlan.total_units)}, avg service level ${n((cPlan.avg_service_level ?? 0) * 100, 1)}%, turnover ${n(cPlan.turnover)}. Total cost delta (constrained minus unconstrained): ${n(pr.total_cost_delta)} INR.`.slice(
         0,
         1500,
       ),
@@ -531,11 +649,15 @@ export function buildArtifactDocs(bundle) {
     for (const c of cSkus) {
       const u = uMap.get(c.sku_id) || {};
       const costDelta = n(c.total_cost - (u.total_cost ?? c.total_cost));
+      const exactCostStr =
+        c.exact_cost != null
+          ? `, exact cost ${n(c.exact_cost)} INR, greedy cost ${n(c.greedy_cost)} INR`
+          : "";
       docs.push({
         artifactType: "portfolio_sku",
         artifactId: portRunId,
         skuId: c.sku_id,
-        text: `Portfolio plan for SKU ${c.sku_id}: Unconstrained service level ${n((u.service_level ?? 0) * 100, 1)}%, ROP ${u.rop ?? "n/a"}, avg inventory ${n(u.avg_inventory)} units, investment ${n(u.inventory_investment)} INR, total cost ${n(u.total_cost)} INR, turnover ${n(u.turnover)}. Constrained service level ${n((c.service_level ?? 0) * 100, 1)}%, ROP ${c.rop ?? "n/a"}, avg inventory ${n(c.avg_inventory)} units, investment ${n(c.inventory_investment)} INR, total cost ${n(c.total_cost)} INR, turnover ${n(c.turnover)}. Cost delta ${costDelta} INR.`.slice(
+        text: `Portfolio plan for SKU ${c.sku_id}: Unconstrained service level ${n((u.service_level ?? 0) * 100, 1)}%, ROP ${u.rop ?? "n/a"}, avg inventory ${n(u.avg_inventory)} units, investment ${n(u.inventory_investment)} INR, total cost ${n(u.total_cost)} INR, turnover ${n(u.turnover)}. Constrained service level ${n((c.service_level ?? 0) * 100, 1)}%, ROP ${c.rop ?? "n/a"}, avg inventory ${n(c.avg_inventory)} units, investment ${n(c.inventory_investment)} INR, total cost ${n(c.total_cost)} INR${exactCostStr}, turnover ${n(c.turnover)}. Cost delta ${costDelta} INR.`.slice(
           0,
           1500,
         ),

@@ -384,11 +384,14 @@ registerJobHandler("transformation", {
 
     const parsedAgg = AggSchema.parse(aggJson);
     const maxDay = parsedAgg.maxDay;
+    const windowStartDay = maxDay - 364;
 
-    // Compute total quantity per SKU and sort
     const skuWithTotals = parsedAgg.skus.map((s) => {
-      const totalQty = s.points.reduce((acc, p) => acc + p[1], 0);
-      return { ...s, totalQty };
+      const pointsInWindow = s.points.filter(
+        ([dayIdx]) => dayIdx >= windowStartDay && dayIdx <= maxDay,
+      );
+      const totalQty = pointsInWindow.reduce((acc, p) => acc + p[1], 0);
+      return { ...s, points: pointsInWindow, totalQty };
     });
 
     skuWithTotals.sort((a, b) => {
@@ -398,9 +401,18 @@ registerJobHandler("transformation", {
       return a.skuId.localeCompare(b.skuId);
     });
 
-    const keptSkus = skuWithTotals.slice(0, MAX_SKUS_PER_SESSION);
-    // Sort kept SKUs by skuId ascending for CSV rows
+    const keptSkus = skuWithTotals.slice(0, 15);
     keptSkus.sort((a, b) => a.skuId.localeCompare(b.skuId));
+
+    const skuStatuses = {};
+    for (const skuItem of keptSkus) {
+      const firstDay =
+        skuItem.points.length > 0
+          ? Math.max(windowStartDay, skuItem.points[0][0])
+          : maxDay;
+      const days = maxDay - firstDay + 1;
+      skuStatuses[skuItem.skuId] = days < 28 ? "insufficient_history" : "ok";
+    }
 
     let processedCsv = "sku_id,date,quantity\n";
     let processedRowsCount = 0;
@@ -408,7 +420,9 @@ registerJobHandler("transformation", {
     for (const skuItem of keptSkus) {
       const pointMap = new Map(skuItem.points);
       const firstDay =
-        skuItem.points.length > 0 ? skuItem.points[0][0] : maxDay;
+        skuItem.points.length > 0
+          ? Math.max(windowStartDay, skuItem.points[0][0])
+          : maxDay;
 
       for (let dayIdx = firstDay; dayIdx <= maxDay; dayIdx++) {
         const dateStr = isoFromDayIndex(dayIdx);
@@ -435,6 +449,7 @@ registerJobHandler("transformation", {
       dateFormat: dataset.mapping.dateFormat,
       skuIds: keptSkus.map((s) => s.skuId),
       seriesEndDate: isoFromDayIndex(maxDay),
+      skuStatuses,
     };
     const validatedTransConfig = TransformationConfig.parse(transConfigObj);
 

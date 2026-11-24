@@ -22,6 +22,7 @@ export const TOOL_NAMES = [
   "get_inventory_risk_summary",
   "get_portfolio_plan",
   "get_model_comparison",
+  "get_dependency_pairs",
 ];
 export const ToolName = z.enum(TOOL_NAMES);
 
@@ -40,18 +41,35 @@ export const GetInventoryRecommendationInput = z
   .object({ skuId: SkuId })
   .strict();
 export const CompareInventoryPoliciesInput = z
-  .object({ skuId: SkuId.optional() })
+  .object({ skuId: SkuId.nullish() })
   .strict();
 
 export const SkuWhatIfOverrides = z
   .object({
     ordering_cost: z.number().finite().positive().max(1_000_000_000).optional(),
-    holding_cost_annual: z.number().finite().positive().max(1_000_000_000).optional(),
-    shortage_penalty: z.number().finite().positive().max(1_000_000_000).optional(),
+    holding_cost_annual: z
+      .number()
+      .finite()
+      .positive()
+      .max(1_000_000_000)
+      .optional(),
+    shortage_penalty: z
+      .number()
+      .finite()
+      .positive()
+      .max(1_000_000_000)
+      .optional(),
+    order_cost: z.number().finite().positive().max(1_000_000_000).optional(),
+    holding_rate: z.number().finite().positive().max(1_000_000_000).optional(),
+    shortage_cost: z.number().finite().positive().max(1_000_000_000).optional(),
     lead_time_mean: z.number().int().min(1).max(28).optional(),
     lead_time_std: z.number().finite().min(0).max(28).optional(),
-    service_level: z.number().finite().min(0.80).max(0.99).optional(),
+    service_level: z.number().finite().min(0.8).max(0.99).optional(),
+    target_service_level: z.number().finite().min(0.8).max(0.99).optional(),
     unit_cost: z.number().finite().positive().max(1_000_000_000).optional(),
+    moq: z.number().int().min(1).optional(),
+    pack_size: z.number().int().min(1).optional(),
+    initial_stock: z.number().int().min(0).optional(),
   })
   .strict()
   .refine((o) => Object.values(o).some((v) => v !== undefined), {
@@ -80,13 +98,21 @@ export const GetRiskSummaryInput = z
 
 export const GetPortfolioPlanInput = z
   .object({
-    skuId: SkuId.optional(),
+    skuId: SkuId.nullish(),
   })
   .strict();
 
 export const GetModelComparisonInput = z
   .object({
-    skuId: SkuId.optional(),
+    skuId: SkuId.nullish(),
+    sku: SkuId.nullish(),
+  })
+  .strict();
+
+export const GetDependencyPairsInput = z
+  .object({
+    skuId: SkuId.nullish(),
+    sku: SkuId.nullish(),
   })
   .strict();
 
@@ -98,18 +124,27 @@ export const TOOL_INPUT_SCHEMAS = {
   get_inventory_risk_summary: GetRiskSummaryInput,
   get_portfolio_plan: GetPortfolioPlanInput,
   get_model_comparison: GetModelComparisonInput,
+  get_dependency_pairs: GetDependencyPairsInput,
 };
 
 // ---------- tool outputs ----------
 export const SkuAssumptions = z
   .object({
-    ordering_cost: num,
-    holding_cost_annual: num,
-    shortage_penalty: num,
+    sku_id: SkuId.optional(),
+    ordering_cost: num.optional(),
+    holding_cost_annual: num.optional(),
+    shortage_penalty: num.optional(),
+    order_cost: num.optional(),
+    holding_rate: num.optional(),
+    shortage_cost: num.optional(),
     lead_time_mean: z.number().int(),
     lead_time_std: num,
-    service_level: num,
+    service_level: num.optional(),
+    target_service_level: num.optional(),
     unit_cost: num,
+    moq: z.number().int().optional(),
+    pack_size: z.number().int().optional(),
+    initial_stock: z.number().int().optional(),
   })
   .strict();
 
@@ -117,13 +152,20 @@ export const AssumptionsView = z
   .object({
     version: z.number().int(),
     skuId: SkuId,
-    ordering_cost: num,
-    holding_cost_annual: num,
-    shortage_penalty: num,
+    ordering_cost: num.optional(),
+    holding_cost_annual: num.optional(),
+    shortage_penalty: num.optional(),
+    order_cost: num.optional(),
+    holding_rate: num.optional(),
+    shortage_cost: num.optional(),
     lead_time_mean: z.number().int(),
     lead_time_std: num,
-    service_level: num,
+    service_level: num.optional(),
+    target_service_level: num.optional(),
     unit_cost: num,
+    moq: z.number().int().optional(),
+    pack_size: z.number().int().optional(),
+    initial_stock: z.number().int().optional(),
   })
   .strict();
 
@@ -239,20 +281,24 @@ export const RunWhatIfOutput = z
       .object({
         deterministic: WhatIfPolicyTotals,
         uncertaintyAware: WhatIfPolicyTotals,
+        quantile: WhatIfPolicyTotals.optional(),
       })
       .strict(),
     scenario: z
       .object({
         deterministic: WhatIfPolicyTotals,
         uncertaintyAware: WhatIfPolicyTotals,
+        quantile: WhatIfPolicyTotals.optional(),
       })
       .strict(),
     deltas: z
       .object({
         deterministicTotalCost: num,
         uncertaintyAwareTotalCost: num,
+        quantileTotalCost: num.optional(),
         deterministicServiceLevel: num,
         uncertaintyAwareServiceLevel: num,
+        quantileServiceLevel: num.optional(),
       })
       .strict(),
     perSku: z.array(
@@ -265,8 +311,11 @@ export const RunWhatIfOutput = z
           ropDeterministicScenario: z.number().int(),
           ropUncertaintyAwareBaseline: z.number().int(),
           ropUncertaintyAwareScenario: z.number().int(),
+          ropQuantileBaseline: z.number().int().optional(),
+          ropQuantileScenario: z.number().int().optional(),
           totalCostDeterministicDelta: num,
           totalCostUncertaintyAwareDelta: num,
+          totalCostQuantileDelta: num.optional(),
         })
         .strict(),
     ),
@@ -305,6 +354,12 @@ export const SkuPortfolioPlanItem = z
     inventoryInvestment: num,
     totalCost: num,
     turnover: num,
+    greedyServiceLevel: num.optional().nullable(),
+    exactServiceLevel: num.optional().nullable(),
+    greedyCost: num.optional().nullable(),
+    exactCost: num.optional().nullable(),
+    greedyRop: z.number().int().optional().nullable(),
+    exactRop: z.number().int().optional().nullable(),
   })
   .strict();
 
@@ -330,12 +385,17 @@ export const SkuPortfolioComparison = z
 
 export const GetPortfolioPlanOutput = z
   .object({
-    status: z.enum(["succeeded", "not_run"]),
+    status: z.enum(["succeeded", "not_run", "infeasible"]),
     portfolioRunId: z.string().nullable().optional(),
     budget: num.nullable().optional(),
     capacity: num.nullable().optional(),
     bindingConstraints: z.array(z.string()),
     budgetShadowPrice: num.nullable().optional(),
+    shadowPrice: num.nullable().optional(),
+    exactCost: num.nullable().optional(),
+    greedyCost: num.nullable().optional(),
+    optimalityGapPct: num.nullable().optional(),
+    minimumFeasibleBudget: num.nullable().optional(),
     totalCostDelta: num.nullable().optional(),
     budgetUsagePct: num.nullable().optional(),
     capacityUsagePct: num.nullable().optional(),
@@ -347,12 +407,23 @@ export const GetPortfolioPlanOutput = z
   })
   .strict();
 
+export const BaselineImprovementSummary = z
+  .object({
+    maePct: num.nullable().optional(),
+    rmsePct: num.nullable().optional(),
+    wapePct: num.nullable().optional(),
+    coverageMinusNominal: num.nullable().optional(),
+  })
+  .strict();
+
 export const ModelMetricsSummary = z
   .object({
     mae: num.nullable().optional(),
     rmse: num.nullable().optional(),
     wape: num.nullable().optional(),
     mase: num.nullable().optional(),
+    coverage: num.nullable().optional(),
+    pinballLoss: num.nullable().optional(),
   })
   .strict();
 
@@ -365,6 +436,10 @@ export const SkuModelComparison = z
     autoets: ModelMetricsSummary.nullable().optional(),
     seasonalNaive: ModelMetricsSummary.nullable().optional(),
     crostonSba: ModelMetricsSummary.nullable().optional(),
+    naive: ModelMetricsSummary.nullable().optional(),
+    globalLgbm: ModelMetricsSummary.nullable().optional(),
+    baselineImprovement: BaselineImprovementSummary.nullable().optional(),
+    coverageMinusNominal: num.nullable().optional(),
     intervalCoverage: num.nullable().optional(),
     intervalMeanWidth: num.nullable().optional(),
   })
@@ -376,6 +451,8 @@ export const ModelAggregateSummary = z
     rmseMean: num.nullable().optional(),
     wapePooled: num.nullable().optional(),
     maseMean: num.nullable().optional(),
+    coverageMean: num.nullable().optional(),
+    pinballLossMean: num.nullable().optional(),
   })
   .strict();
 
@@ -389,6 +466,10 @@ export const GetModelComparisonOutput = z
         autoets: ModelAggregateSummary.nullable().optional(),
         seasonalNaive: ModelAggregateSummary.nullable().optional(),
         crostonSba: ModelAggregateSummary.nullable().optional(),
+        naive: ModelAggregateSummary.nullable().optional(),
+        globalLgbm: ModelAggregateSummary.nullable().optional(),
+        baselineImprovement: BaselineImprovementSummary.nullable().optional(),
+        coverageMinusNominal: num.nullable().optional(),
         coverageMean: num.nullable().optional(),
         meanWidthMean: num.nullable().optional(),
       })
@@ -396,6 +477,27 @@ export const GetModelComparisonOutput = z
       .optional(),
     chosenModelCounts: z.record(z.string(), z.number().int()).optional(),
     skus: z.array(SkuModelComparison).optional(),
+    message: z.string().nullable().optional(),
+  })
+  .strict();
+
+export const DependencyPairView = z
+  .object({
+    sku_i: z.string(),
+    sku_j: z.string(),
+    rho: num,
+    relation: z.enum(["complementary", "substitute-like"]),
+  })
+  .strict();
+
+export const GetDependencyPairsOutput = z
+  .object({
+    status: z.enum(["computed", "not_available"]),
+    optimizationRunId: z.string().nullable().optional(),
+    skuId: SkuId.nullable().optional(),
+    poolingRatio: num.nullable().optional(),
+    pairsCount: z.number().int().optional(),
+    pairs: z.array(DependencyPairView),
     message: z.string().nullable().optional(),
   })
   .strict();

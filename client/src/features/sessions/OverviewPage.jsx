@@ -121,6 +121,14 @@ export default function OverviewPage() {
 
         <div className="flex items-center gap-3">
           <Link
+            to={`/sessions/${session.id}/summary`}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold border bg-slate-900 hover:bg-slate-800 border-white/[0.08] text-slate-200 transition-colors"
+          >
+            <span>Executive Summary</span>
+            <ArrowUpRight size={14} />
+          </Link>
+
+          <Link
             to={aiEligible ? `/ask-ai?sessionId=${session.id}` : "#"}
             onClick={(e) => {
               if (!aiEligible) e.preventDefault();

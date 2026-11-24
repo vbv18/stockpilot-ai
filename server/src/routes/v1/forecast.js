@@ -91,10 +91,7 @@ router.get("/", validate({ params: IdParam }), async (req, res, next) => {
     const session = await getSessionOwned(user.userId, params.sessionId);
 
     if (!session.activeForecastRunId) {
-      throw new AppError(
-        "NOT_FOUND",
-        "No active forecast run found for session",
-      );
+      return res.status(200).json({ data: null });
     }
 
     const run = await ForecastRunModel.findOne({
@@ -103,7 +100,7 @@ router.get("/", validate({ params: IdParam }), async (req, res, next) => {
       sessionId: params.sessionId,
     });
     if (!run) {
-      throw new AppError("NOT_FOUND", "Forecast run not found");
+      return res.status(200).json({ data: null });
     }
 
     let history = [];

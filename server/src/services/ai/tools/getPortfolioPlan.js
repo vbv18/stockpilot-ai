@@ -46,7 +46,8 @@ export async function getPortfolioPlan(rawArgs, bundle) {
       status: "not_run",
       portfolioRunId: null,
       bindingConstraints: [],
-      message: "No succeeded portfolio optimization run found for this session.",
+      message:
+        "No succeeded portfolio optimization run found for this session.",
     });
     return {
       output,
@@ -63,16 +64,32 @@ export async function getPortfolioPlan(rawArgs, bundle) {
   const unconstrainedPlan = res.unconstrained_plan || null;
   const constrainedPlan = res.constrained_plan || null;
 
-  const uMap = new Map((unconstrainedPlan?.skus || []).map((s) => [s.sku_id, s]));
+  const uMap = new Map(
+    (unconstrainedPlan?.skus || []).map((s) => [s.sku_id, s]),
+  );
   const cMap = new Map((constrainedPlan?.skus || []).map((s) => [s.sku_id, s]));
 
+  const status =
+    res.status === "infeasible" || portfolioRun.status === "infeasible"
+      ? "infeasible"
+      : portfolioRun.status === "succeeded" ||
+          res.status === "optimal" ||
+          res.status === "succeeded"
+        ? "succeeded"
+        : "not_run";
+
   const baseOutput = {
-    status: "succeeded",
+    status,
     portfolioRunId: portfolioRun._id.toString(),
     budget: res.budget ?? null,
     capacity: res.capacity ?? null,
     bindingConstraints: res.binding_constraints || [],
     budgetShadowPrice: res.budget_shadow_price ?? null,
+    shadowPrice: res.shadow_price ?? res.budget_shadow_price ?? null,
+    exactCost: res.exact_cost ?? null,
+    greedyCost: res.greedy_cost ?? null,
+    optimalityGapPct: res.optimality_gap_pct ?? null,
+    minimumFeasibleBudget: res.minimum_feasible_budget ?? null,
     totalCostDelta: res.total_cost_delta ?? null,
     budgetUsagePct: res.budget_usage_pct ?? null,
     capacityUsagePct: res.capacity_usage_pct ?? null,
@@ -95,9 +112,12 @@ export async function getPortfolioPlan(rawArgs, bundle) {
       skuId: args.skuId,
       unconstrained: u || c,
       constrained: c || u,
-      costDelta: (c?.totalCost != null && u?.totalCost != null) ? c.totalCost - u.totalCost : 0,
+      costDelta:
+        c?.totalCost != null && u?.totalCost != null
+          ? c.totalCost - u.totalCost
+          : 0,
       serviceLevelDelta:
-        (c?.serviceLevel != null && u?.serviceLevel != null)
+        c?.serviceLevel != null && u?.serviceLevel != null
           ? c.serviceLevel - u.serviceLevel
           : 0,
     };
@@ -118,8 +138,16 @@ export async function getPortfolioPlan(rawArgs, bundle) {
     };
   }
 
-  const allSkuIds = [...new Set([...uMap.keys(), ...cMap.keys()])].sort();
-  const skus = allSkuIds.map((sId) => {
+  const allSkuIds = [...new Set([...uMap.keys(), ...cMap.keys()])].sort((a, b) => {
+    const deltaA = Math.abs(
+      (cMap.get(a)?.total_cost ?? 0) - (uMap.get(a)?.total_cost ?? 0),
+    );
+    const deltaB = Math.abs(
+      (cMap.get(b)?.total_cost ?? 0) - (uMap.get(b)?.total_cost ?? 0),
+    );
+    return deltaB - deltaA;
+  });
+  const skus = allSkuIds.slice(0, 6).map((sId) => {
     const u = formatPlanItem(uMap.get(sId));
     const c = formatPlanItem(cMap.get(sId));
     return {
@@ -127,9 +155,11 @@ export async function getPortfolioPlan(rawArgs, bundle) {
       unconstrained: u || c,
       constrained: c || u,
       costDelta:
-        (c?.totalCost != null && u?.totalCost != null) ? c.totalCost - u.totalCost : 0,
+        c?.totalCost != null && u?.totalCost != null
+          ? c.totalCost - u.totalCost
+          : 0,
       serviceLevelDelta:
-        (c?.serviceLevel != null && u?.serviceLevel != null)
+        c?.serviceLevel != null && u?.serviceLevel != null
           ? c.serviceLevel - u.serviceLevel
           : 0,
     };

@@ -47,13 +47,24 @@ export async function getInventoryRecommendation(rawArgs, bundle) {
   const assumptionsView = {
     version: assumptions.version ?? 1,
     skuId: args.skuId,
-    ordering_cost: skuAssump.ordering_cost,
-    holding_cost_annual: skuAssump.holding_cost_annual,
-    shortage_penalty: skuAssump.shortage_penalty,
+    ordering_cost: skuAssump.ordering_cost ?? skuAssump.order_cost ?? 0,
+    holding_cost_annual:
+      skuAssump.holding_cost_annual ?? skuAssump.holding_rate ?? 0,
+    shortage_penalty:
+      skuAssump.shortage_penalty ?? skuAssump.shortage_cost ?? 0,
+    order_cost: skuAssump.order_cost ?? skuAssump.ordering_cost ?? 0,
+    holding_rate: skuAssump.holding_rate ?? skuAssump.holding_cost_annual ?? 0,
+    shortage_cost: skuAssump.shortage_cost ?? skuAssump.shortage_penalty ?? 0,
     lead_time_mean: skuAssump.lead_time_mean,
     lead_time_std: skuAssump.lead_time_std ?? 0,
-    service_level: skuAssump.service_level,
+    service_level:
+      skuAssump.service_level ?? skuAssump.target_service_level ?? 0.95,
+    target_service_level:
+      skuAssump.target_service_level ?? skuAssump.service_level ?? 0.95,
     unit_cost: skuAssump.unit_cost,
+    moq: skuAssump.moq ?? 1,
+    pack_size: skuAssump.pack_size ?? 1,
+    initial_stock: skuAssump.initial_stock ?? 0,
   };
 
   // Only include simulation if active simulation belongs to this optimization run

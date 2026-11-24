@@ -2,15 +2,23 @@ import mongoose from "mongoose";
 
 const skuAssumptionSchema = new mongoose.Schema(
   {
-    ordering_cost: {
+    sku_id: {
+      type: String,
+      required: true,
+    },
+    unit_cost: {
       type: Number,
       required: true,
     },
-    holding_cost_annual: {
+    order_cost: {
       type: Number,
       required: true,
     },
-    shortage_penalty: {
+    holding_rate: {
+      type: Number,
+      required: true,
+    },
+    shortage_cost: {
       type: Number,
       required: true,
     },
@@ -22,14 +30,26 @@ const skuAssumptionSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
-    service_level: {
+    target_service_level: {
       type: Number,
       required: true,
     },
-    unit_cost: {
+    moq: {
       type: Number,
-      required: true,
+      default: 1,
     },
+    pack_size: {
+      type: Number,
+      default: 1,
+    },
+    initial_stock: {
+      type: Number,
+      default: 0,
+    },
+    ordering_cost: { type: Number },
+    holding_cost_annual: { type: Number },
+    shortage_penalty: { type: Number },
+    service_level: { type: Number },
   },
   { _id: false },
 );

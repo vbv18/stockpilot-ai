@@ -54,8 +54,5 @@ const replayRunSchema = new mongoose.Schema(
 
 replayRunSchema.index({ userId: 1, sessionId: 1, createdAt: -1 });
 
-export const ReplayRunModel = mongoose.model(
-  "replay_runs",
-  replayRunSchema,
-);
+export const ReplayRunModel = mongoose.model("replay_runs", replayRunSchema);
 export default ReplayRunModel;

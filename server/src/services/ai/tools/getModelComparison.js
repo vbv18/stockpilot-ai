@@ -14,6 +14,21 @@ function formatMetrics(m) {
     rmse: m.rmse ?? null,
     wape: m.wape ?? null,
     mase: m.mase ?? null,
+    coverage: m.coverage ?? null,
+    pinballLoss: m.pinball_loss ?? null,
+  };
+}
+
+/**
+ * Format baseline improvement
+ */
+function formatBaselineImprovement(bi) {
+  if (!bi) return null;
+  return {
+    maePct: bi.mae_pct ?? null,
+    rmsePct: bi.rmse_pct ?? null,
+    wapePct: bi.wape_pct ?? null,
+    coverageMinusNominal: bi.coverage_minus_nominal ?? null,
   };
 }
 
@@ -30,7 +45,17 @@ function formatSkuEval(skuId, data) {
     autoets: formatMetrics(data.autoets),
     seasonalNaive: formatMetrics(data.seasonal_naive),
     crostonSba: formatMetrics(data.croston_sba),
-    intervalCoverage: data.interval_metrics?.coverage ?? null,
+    naive: formatMetrics(data.naive),
+    globalLgbm: formatMetrics(data.global_lgbm),
+    baselineImprovement: formatBaselineImprovement(data.baseline_improvement),
+    coverageMinusNominal:
+      data.coverage_minus_nominal ??
+      data.baseline_improvement?.coverage_minus_nominal ??
+      null,
+    intervalCoverage:
+      data.interval_metrics?.coverage ??
+      data.interval_metrics?.coverage_p10_p90 ??
+      null,
     intervalMeanWidth: data.interval_metrics?.mean_width ?? null,
   };
 }
@@ -39,7 +64,11 @@ function formatSkuEval(skuId, data) {
  * get_model_comparison tool
  */
 export async function getModelComparison(rawArgs, bundle) {
-  const args = GetModelComparisonInput.parse(rawArgs);
+  const normalizedArgs = {
+    ...rawArgs,
+    skuId: rawArgs?.skuId || rawArgs?.sku || undefined,
+  };
+  const args = GetModelComparisonInput.parse(normalizedArgs);
   const { forecastRun } = bundle;
 
   if (!forecastRun || !forecastRun.result?.evaluation) {
@@ -52,7 +81,9 @@ export async function getModelComparison(rawArgs, bundle) {
       output,
       evidence: {
         artifactType: "evaluation",
-        artifactId: forecastRun ? forecastRun._id.toString() : bundle.session._id.toString(),
+        artifactId: forecastRun
+          ? forecastRun._id.toString()
+          : bundle.session._id.toString(),
         skuId: args.skuId || null,
         label: "Model comparison (not evaluated)",
       },
@@ -105,31 +136,29 @@ export async function getModelComparison(rawArgs, bundle) {
     }
   }
 
+  const mapAggregateModel = (m) => {
+    if (!m) return null;
+    return {
+      maeMean: m.mae_mean ?? null,
+      rmseMean: m.rmse_mean ?? null,
+      wapePooled: m.wape_pooled ?? null,
+      maseMean: m.mase_mean ?? null,
+      coverageMean: m.coverage_mean ?? null,
+      pinballLossMean: m.pinball_loss_mean ?? null,
+    };
+  };
+
   const aggregate = {
-    autoets: agg.autoets
-      ? {
-          maeMean: agg.autoets.mae_mean ?? null,
-          rmseMean: agg.autoets.rmse_mean ?? null,
-          wapePooled: agg.autoets.wape_pooled ?? null,
-          maseMean: agg.autoets.mase_mean ?? null,
-        }
-      : null,
-    seasonalNaive: agg.seasonal_naive
-      ? {
-          maeMean: agg.seasonal_naive.mae_mean ?? null,
-          rmseMean: agg.seasonal_naive.rmse_mean ?? null,
-          wapePooled: agg.seasonal_naive.wape_pooled ?? null,
-          maseMean: agg.seasonal_naive.mase_mean ?? null,
-        }
-      : null,
-    crostonSba: agg.croston_sba
-      ? {
-          maeMean: agg.croston_sba.mae_mean ?? null,
-          rmseMean: agg.croston_sba.rmse_mean ?? null,
-          wapePooled: agg.croston_sba.wape_pooled ?? null,
-          maseMean: agg.croston_sba.mase_mean ?? null,
-        }
-      : null,
+    autoets: mapAggregateModel(agg.autoets),
+    seasonalNaive: mapAggregateModel(agg.seasonal_naive),
+    crostonSba: mapAggregateModel(agg.croston_sba),
+    naive: mapAggregateModel(agg.naive),
+    globalLgbm: mapAggregateModel(agg.global_lgbm),
+    baselineImprovement: formatBaselineImprovement(
+      agg.baseline_improvement || evaluation.baseline_improvement,
+    ),
+    coverageMinusNominal:
+      agg.coverage_minus_nominal ?? evaluation.coverage_minus_nominal ?? null,
     coverageMean: agg.coverage_mean ?? null,
     meanWidthMean: agg.mean_width_mean ?? null,
   };

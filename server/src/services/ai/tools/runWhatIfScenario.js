@@ -56,27 +56,70 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
     const scenarioAssumptions = {};
 
     for (const [skuId, baseVals] of Object.entries(baseSkus)) {
+      const orderCost = baseVals.order_cost ?? baseVals.ordering_cost ?? 100;
+      const holdingRate =
+        baseVals.holding_rate ?? baseVals.holding_cost_annual ?? 10;
+      const shortageCost =
+        baseVals.shortage_cost ?? baseVals.shortage_penalty ?? 50;
+      const targetServiceLevel =
+        baseVals.target_service_level ?? baseVals.service_level ?? 0.95;
+      const leadTimeMean = baseVals.lead_time_mean ?? 7;
+      const leadTimeStd = baseVals.lead_time_std ?? 0;
+      const unitCost = baseVals.unit_cost ?? 20;
+      const moq = baseVals.moq ?? 1;
+      const packSize = baseVals.pack_size ?? 1;
+      const initialStock = baseVals.initial_stock ?? 0;
+
       const bVals = {
-        ordering_cost: baseVals.ordering_cost,
-        holding_cost_annual: baseVals.holding_cost_annual,
-        shortage_penalty: baseVals.shortage_penalty,
-        lead_time_mean: baseVals.lead_time_mean,
-        lead_time_std: baseVals.lead_time_std ?? 0,
-        service_level: baseVals.service_level,
-        unit_cost: baseVals.unit_cost,
+        sku_id: skuId,
+        unit_cost: unitCost,
+        order_cost: orderCost,
+        holding_rate: holdingRate,
+        shortage_cost: shortageCost,
+        lead_time_mean: leadTimeMean,
+        lead_time_std: leadTimeStd,
+        target_service_level: targetServiceLevel,
+        moq,
+        pack_size: packSize,
+        initial_stock: initialStock,
+        ordering_cost: orderCost,
+        holding_cost_annual: holdingRate,
+        shortage_penalty: shortageCost,
+        service_level: targetServiceLevel,
       };
       baselineAssumptions[skuId] = bVals;
 
       const ovr = args.overrides[skuId] || {};
+      const scOrderCost = ovr.order_cost ?? ovr.ordering_cost ?? orderCost;
+      const scHoldingRate =
+        ovr.holding_rate ?? ovr.holding_cost_annual ?? holdingRate;
+      const scShortageCost =
+        ovr.shortage_cost ?? ovr.shortage_penalty ?? shortageCost;
+      const scLeadTimeMean = ovr.lead_time_mean ?? leadTimeMean;
+      const scLeadTimeStd = ovr.lead_time_std ?? leadTimeStd;
+      const scServiceLevel =
+        ovr.target_service_level ?? ovr.service_level ?? targetServiceLevel;
+      const scUnitCost = ovr.unit_cost ?? unitCost;
+      const scMoq = ovr.moq ?? moq;
+      const scPackSize = ovr.pack_size ?? packSize;
+      const scInitialStock = ovr.initial_stock ?? initialStock;
+
       scenarioAssumptions[skuId] = {
-        ordering_cost: ovr.ordering_cost ?? bVals.ordering_cost,
-        holding_cost_annual:
-          ovr.holding_cost_annual ?? bVals.holding_cost_annual,
-        shortage_penalty: ovr.shortage_penalty ?? bVals.shortage_penalty,
-        lead_time_mean: ovr.lead_time_mean ?? bVals.lead_time_mean,
-        lead_time_std: ovr.lead_time_std ?? bVals.lead_time_std,
-        service_level: ovr.service_level ?? bVals.service_level,
-        unit_cost: ovr.unit_cost ?? bVals.unit_cost,
+        sku_id: skuId,
+        unit_cost: scUnitCost,
+        order_cost: scOrderCost,
+        holding_rate: scHoldingRate,
+        shortage_cost: scShortageCost,
+        lead_time_mean: scLeadTimeMean,
+        lead_time_std: scLeadTimeStd,
+        target_service_level: scServiceLevel,
+        moq: scMoq,
+        pack_size: scPackSize,
+        initial_stock: scInitialStock,
+        ordering_cost: scOrderCost,
+        holding_cost_annual: scHoldingRate,
+        shortage_penalty: scShortageCost,
+        service_level: scServiceLevel,
       };
     }
 
@@ -136,14 +179,22 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
       const fcSku = forecastMap.get(optSku.sku_id);
       if (!fcSku) continue;
 
+      const ropDet = optSku.rop_deterministic ?? optSku.s_det ?? 0;
+      const ropUnc = optSku.rop_uncertainty_aware ?? optSku.s_emp ?? 0;
+      const ropQua = optSku.rop_quantile ?? optSku.s_quant ?? ropUnc;
+
       simulateSkus.push({
         sku_id: optSku.sku_id,
         forecast_mean: fcSku.autoets_mean,
         residual_blocks: fcSku.residual_blocks,
+        residual_std: fcSku.residual_std,
         eoq: optSku.eoq,
-        rop_deterministic: optSku.rop_deterministic,
-        rop_uncertainty_aware: optSku.rop_uncertainty_aware,
-        rop_quantile: optSku.rop_quantile ?? optSku.rop_uncertainty_aware,
+        rop_deterministic: ropDet,
+        rop_uncertainty_aware: ropUnc,
+        rop_quantile: ropQua,
+        s_det: optSku.s_det ?? ropDet,
+        s_quant: optSku.s_quant ?? ropQua,
+        s_emp: optSku.s_emp ?? ropUnc,
       });
     }
 
@@ -189,10 +240,13 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
       {};
     const scenAgg = simResult.aggregate || {};
 
-    const baseDet = baseAgg.deterministic || {};
-    const baseUnc = baseAgg.uncertainty_aware || {};
-    const scenDet = scenAgg.deterministic || {};
-    const scenUnc = scenAgg.uncertainty_aware || {};
+    const baseDet = baseAgg.deterministic || baseAgg.s_det || {};
+    const baseUnc = baseAgg.uncertainty_aware || baseAgg.s_emp || {};
+    const baseQua = baseAgg.quantile || baseAgg.s_quant || {};
+
+    const scenDet = scenAgg.deterministic || scenAgg.s_det || {};
+    const scenUnc = scenAgg.uncertainty_aware || scenAgg.s_emp || {};
+    const scenQua = scenAgg.quantile || scenAgg.s_quant || {};
 
     const mapTotals = (t) => ({
       totalCost: t.mean_total_cost ?? t.total_cost ?? 0,
@@ -208,10 +262,12 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
     const baselineTotals = {
       deterministic: mapTotals(baseDet),
       uncertaintyAware: mapTotals(baseUnc),
+      quantile: mapTotals(baseQua),
     };
     const scenarioTotals = {
       deterministic: mapTotals(scenDet),
       uncertaintyAware: mapTotals(scenUnc),
+      quantile: mapTotals(scenQua),
     };
 
     const deltas = {
@@ -221,12 +277,17 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
       uncertaintyAwareTotalCost:
         scenarioTotals.uncertaintyAware.totalCost -
         baselineTotals.uncertaintyAware.totalCost,
+      quantileTotalCost:
+        scenarioTotals.quantile.totalCost - baselineTotals.quantile.totalCost,
       deterministicServiceLevel:
         scenarioTotals.deterministic.serviceLevel -
         baselineTotals.deterministic.serviceLevel,
       uncertaintyAwareServiceLevel:
         scenarioTotals.uncertaintyAware.serviceLevel -
         baselineTotals.uncertaintyAware.serviceLevel,
+      quantileServiceLevel:
+        scenarioTotals.quantile.serviceLevel -
+        baselineTotals.quantile.serviceLevel,
     };
 
     const perSku = [];
@@ -267,33 +328,50 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
         sSim &&
         bSim
       ) {
+        const sDet = sSim.deterministic || sSim.s_det || {};
+        const bDet = bSim.deterministic || bSim.s_det || {};
         const sDetCost =
-          sSim.deterministic?.mean_total_cost ??
-          sSim.deterministic?.total_cost_mean ??
-          0;
+          sDet.mean_total_cost ?? sDet.total_cost_mean ?? sDet.total_cost ?? 0;
         const bDetCost =
-          bSim.deterministic?.mean_total_cost ??
-          bSim.deterministic?.total_cost_mean ??
-          0;
+          bDet.mean_total_cost ?? bDet.total_cost_mean ?? bDet.total_cost ?? 0;
+
+        const sUnc = sSim.uncertainty_aware || sSim.s_emp || {};
+        const bUnc = bSim.uncertainty_aware || bSim.s_emp || {};
         const sUncCost =
-          sSim.uncertainty_aware?.mean_total_cost ??
-          sSim.uncertainty_aware?.total_cost_mean ??
-          0;
+          sUnc.mean_total_cost ?? sUnc.total_cost_mean ?? sUnc.total_cost ?? 0;
         const bUncCost =
-          bSim.uncertainty_aware?.mean_total_cost ??
-          bSim.uncertainty_aware?.total_cost_mean ??
-          0;
+          bUnc.mean_total_cost ?? bUnc.total_cost_mean ?? bUnc.total_cost ?? 0;
+
+        const sQua = sSim.quantile || sSim.s_quant || {};
+        const bQua = bSim.quantile || bSim.s_quant || {};
+        const sQuaCost =
+          sQua.mean_total_cost ?? sQua.total_cost_mean ?? sQua.total_cost ?? 0;
+        const bQuaCost =
+          bQua.mean_total_cost ?? bQua.total_cost_mean ?? bQua.total_cost ?? 0;
 
         perSku.push({
           skuId,
           eoqBaseline: bOpt.eoq,
           eoqScenario: sOpt.eoq,
-          ropDeterministicBaseline: bOpt.rop_deterministic,
-          ropDeterministicScenario: sOpt.rop_deterministic,
-          ropUncertaintyAwareBaseline: bOpt.rop_uncertainty_aware,
-          ropUncertaintyAwareScenario: sOpt.rop_uncertainty_aware,
+          ropDeterministicBaseline: bOpt.rop_deterministic ?? bOpt.s_det ?? 0,
+          ropDeterministicScenario: sOpt.rop_deterministic ?? sOpt.s_det ?? 0,
+          ropUncertaintyAwareBaseline:
+            bOpt.rop_uncertainty_aware ?? bOpt.s_emp ?? 0,
+          ropUncertaintyAwareScenario:
+            sOpt.rop_uncertainty_aware ?? sOpt.s_emp ?? 0,
+          ropQuantileBaseline:
+            bOpt.rop_quantile ??
+            bOpt.s_quant ??
+            bOpt.rop_uncertainty_aware ??
+            0,
+          ropQuantileScenario:
+            sOpt.rop_quantile ??
+            sOpt.s_quant ??
+            sOpt.rop_uncertainty_aware ??
+            0,
           totalCostDeterministicDelta: sDetCost - bDetCost,
           totalCostUncertaintyAwareDelta: sUncCost - bUncCost,
+          totalCostQuantileDelta: sQuaCost - bQuaCost,
         });
       }
     }
@@ -307,7 +385,7 @@ export async function runWhatIfScenario(rawArgs, bundle, ctx) {
       scenario: scenarioTotals,
       deltas,
       perSku,
-      note: "What-if results are a separate scenario. Baseline assumptions and results were not changed.",
+      note: "What-if results are a separate scenario across all three policies. Baseline assumptions and results were not changed.",
     });
 
     return {

@@ -12,7 +12,14 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { ChevronDown, ChevronUp, History, Loader2, Play, RotateCcw } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronUp,
+  History,
+  Loader2,
+  Play,
+  RotateCcw,
+} from "lucide-react";
 import { COPY } from "../../lib/copy.js";
 import {
   fmtDateTime,
@@ -102,9 +109,13 @@ function CostVsFillRateChart({ skuId, sweep }) {
     return rows;
   }, [sweep]);
 
-  const activeData = xAxisMode === "fill_rate" ? fillRateData : serviceLevelData;
+  const activeData =
+    xAxisMode === "fill_rate" ? fillRateData : serviceLevelData;
 
-  if (!sweep || (!sweep.deterministic?.length && !sweep.uncertainty_aware?.length)) {
+  if (
+    !sweep ||
+    (!sweep.deterministic?.length && !sweep.uncertainty_aware?.length)
+  ) {
     return (
       <div className="p-4 text-center text-xs text-slate-500 italic">
         No service level sweep data available for {skuId}.
@@ -155,7 +166,11 @@ function CostVsFillRateChart({ skuId, sweep }) {
             data={activeData}
             margin={{ top: 10, right: 20, left: 10, bottom: 15 }}
           >
-            <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.3} />
+            <CartesianGrid
+              strokeDasharray="3 3"
+              stroke="#334155"
+              opacity={0.3}
+            />
             {xAxisMode === "fill_rate" ? (
               <XAxis
                 dataKey="x"
@@ -189,7 +204,9 @@ function CostVsFillRateChart({ skuId, sweep }) {
             <YAxis
               stroke="#64748b"
               fontSize={10}
-              tickFormatter={(v) => `₹${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}`}
+              tickFormatter={(v) =>
+                `₹${v >= 1000 ? `${(v / 1000).toFixed(1)}k` : v}`
+              }
               label={{
                 value: "Total Cost (₹)",
                 angle: -90,
@@ -205,11 +222,20 @@ function CostVsFillRateChart({ skuId, sweep }) {
                 return (
                   <div className="bg-[#13151c] border border-white/[0.1] rounded-xl p-3 text-xs shadow-xl flex flex-col gap-1.5 min-w-[200px]">
                     <span className="font-semibold text-slate-200 border-b border-white/[0.06] pb-1">
-                      {skuId} — {xAxisMode === "fill_rate" ? `Fill Rate: ${p?.fillRate}%` : `Target Service Level: ${p?.serviceLevelPct}`}
+                      {skuId} —{" "}
+                      {xAxisMode === "fill_rate"
+                        ? `Fill Rate: ${p?.fillRate}%`
+                        : `Target Service Level: ${p?.serviceLevelPct}`}
                     </span>
                     {payload.map((entry, idx) => (
-                      <div key={idx} className="flex justify-between items-center gap-3">
-                        <span style={{ color: entry.color }} className="font-medium">
+                      <div
+                        key={idx}
+                        className="flex justify-between items-center gap-3"
+                      >
+                        <span
+                          style={{ color: entry.color }}
+                          className="font-medium"
+                        >
                           {entry.name}:
                         </span>
                         <span className="font-mono text-slate-100 font-bold">
@@ -369,10 +395,22 @@ export default function SimulationPage() {
   };
 
   const aggregate = simData?.result?.aggregate;
-  const detAgg = aggregate?.deterministic;
-  const empAgg = aggregate?.uncertainty_aware;
-  const quaAgg = aggregate?.quantile;
+  const detAgg = aggregate?.deterministic || aggregate?.s_det;
+  const empAgg = aggregate?.uncertainty_aware || aggregate?.s_emp;
+  const quaAgg = aggregate?.quantile || aggregate?.s_quant;
   const costDiff = aggregate?.mean_total_cost_diff_sum ?? 0;
+
+  const simAggCosts = [
+    { id: "det", cost: detAgg?.total_cost },
+    { id: "qua", cost: quaAgg?.total_cost },
+    { id: "emp", cost: empAgg?.total_cost },
+  ].filter((c) => c.cost != null && !isNaN(c.cost));
+  const minSimAggCost =
+    simAggCosts.length > 0 ? Math.min(...simAggCosts.map((c) => c.cost)) : null;
+  const bestSimAggPolicy =
+    minSimAggCost != null
+      ? simAggCosts.find((c) => Math.abs(c.cost - minSimAggCost) < 1e-4)?.id
+      : null;
 
   // Cost breakdown chart data
   const costChartData = useMemo(() => {
@@ -409,9 +447,15 @@ export default function SimulationPage() {
       { policy: "Deterministic", serviceLevel: detAgg.service_level * 100 },
     ];
     if (quaAgg) {
-      items.push({ policy: "Quantile", serviceLevel: quaAgg.service_level * 100 });
+      items.push({
+        policy: "Quantile",
+        serviceLevel: quaAgg.service_level * 100,
+      });
     }
-    items.push({ policy: "Uncertainty-Aware", serviceLevel: empAgg.service_level * 100 });
+    items.push({
+      policy: "Uncertainty-Aware",
+      serviceLevel: empAgg.service_level * 100,
+    });
     return items;
   }, [detAgg, quaAgg, empAgg]);
 
@@ -424,11 +468,14 @@ export default function SimulationPage() {
     if (quaAgg) {
       items.push({ policy: "Quantile", stockoutUnits: quaAgg.stockout_units });
     }
-    items.push({ policy: "Uncertainty-Aware", stockoutUnits: empAgg.stockout_units });
+    items.push({
+      policy: "Uncertainty-Aware",
+      stockoutUnits: empAgg.stockout_units,
+    });
     return items;
   }, [detAgg, quaAgg, empAgg]);
 
-  const skusList = simData?.result?.skus || [];
+  const skusList = useMemo(() => simData?.result?.skus || [], [simData]);
   const sweepBySku = simData?.sweep || simData?.result?.sweep || {};
   const [selectedChartSku, setSelectedChartSku] = useState(null);
   const chartSkuId = selectedChartSku || (skusList[0]?.sku_id ?? null);
@@ -438,10 +485,27 @@ export default function SimulationPage() {
   const replayRun = replayData?.latest;
   const replayAgg = replayRun?.aggregate;
   const replaySkus = replayRun?.skus || [];
-  const replayDet = replayAgg?.deterministic || replayAgg?.det;
-  const replayQua = replayAgg?.quantile;
-  const replayEmp = replayAgg?.uncertainty_aware || replayAgg?.unc;
+  const replayDet =
+    replayAgg?.s_det || replayAgg?.deterministic || replayAgg?.det;
+  const replayQua = replayAgg?.s_quant || replayAgg?.quantile;
+  const replayEmp =
+    replayAgg?.s_emp || replayAgg?.uncertainty_aware || replayAgg?.unc;
   const hasReplay = replayRun && replayRun.status === "succeeded";
+
+  const replayAggCosts = [
+    { id: "det", cost: replayDet?.total_cost },
+    { id: "qua", cost: replayQua?.total_cost },
+    { id: "emp", cost: replayEmp?.total_cost },
+  ].filter((c) => c.cost != null && !isNaN(c.cost));
+  const minReplayAggCost =
+    replayAggCosts.length > 0
+      ? Math.min(...replayAggCosts.map((c) => c.cost))
+      : null;
+  const bestReplayAggPolicy =
+    minReplayAggCost != null
+      ? replayAggCosts.find((c) => Math.abs(c.cost - minReplayAggCost) < 1e-4)
+          ?.id
+      : null;
 
   const simSkuMap = useMemo(() => {
     const map = new Map();
@@ -582,9 +646,16 @@ export default function SimulationPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {/* Deterministic Card */}
             <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col gap-3">
-              <span className="text-xs font-bold text-slate-300">
-                Deterministic Policy (ROP_d)
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-slate-300">
+                  Deterministic Policy (s_det)
+                </span>
+                {bestSimAggPolicy === "det" && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Best Cost
+                  </span>
+                )}
+              </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-slate-100">
                   {fmtInr(detAgg?.total_cost)}
@@ -593,15 +664,24 @@ export default function SimulationPage() {
               </div>
               <div className="flex flex-col gap-1.5 text-xs text-slate-400 pt-2 border-t border-white/[0.04]">
                 <div className="flex justify-between">
-                  <span>Service Level (Fill Rate):</span>
+                  <span>Fill Rate:</span>
                   <span className="font-mono text-slate-200 font-semibold">
-                    {fmtPct(detAgg?.service_level, 2)}
+                    {fmtPct(detAgg?.fill_rate ?? detAgg?.service_level, 2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Cycle Service Level (CSL):</span>
+                  <span className="font-mono text-slate-200 font-semibold">
+                    {fmtPct(detAgg?.CSL ?? detAgg?.csl, 2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Stockout Days Rate:</span>
                   <span className="font-mono text-slate-200">
-                    {fmtPct(detAgg?.stockout_rate_mean, 1)}
+                    {fmtPct(
+                      detAgg?.stockout_day_rate ?? detAgg?.stockout_rate_mean,
+                      1,
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -627,9 +707,16 @@ export default function SimulationPage() {
 
             {/* Quantile Policy Card */}
             <div className="bg-[#13151c] border border-sky-500/20 rounded-2xl p-5 flex flex-col gap-3">
-              <span className="text-xs font-bold text-sky-400">
-                Quantile Policy (ROP_q)
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-sky-400">
+                  Quantile Policy (s_quant)
+                </span>
+                {bestSimAggPolicy === "qua" && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Best Cost
+                  </span>
+                )}
+              </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-sky-300">
                   {quaAgg ? fmtInr(quaAgg.total_cost) : "—"}
@@ -638,15 +725,28 @@ export default function SimulationPage() {
               </div>
               <div className="flex flex-col gap-1.5 text-xs text-slate-400 pt-2 border-t border-white/[0.04]">
                 <div className="flex justify-between">
-                  <span>Service Level (Fill Rate):</span>
+                  <span>Fill Rate:</span>
                   <span className="font-mono text-sky-300 font-semibold">
-                    {quaAgg ? fmtPct(quaAgg.service_level, 2) : "—"}
+                    {quaAgg
+                      ? fmtPct(quaAgg.fill_rate ?? quaAgg.service_level, 2)
+                      : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Cycle Service Level (CSL):</span>
+                  <span className="font-mono text-sky-300 font-semibold">
+                    {quaAgg ? fmtPct(quaAgg.CSL ?? quaAgg.csl, 2) : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Stockout Days Rate:</span>
                   <span className="font-mono text-slate-200">
-                    {quaAgg ? fmtPct(quaAgg.stockout_rate_mean, 1) : "—"}
+                    {quaAgg
+                      ? fmtPct(
+                          quaAgg.stockout_day_rate ?? quaAgg.stockout_rate_mean,
+                          1,
+                        )
+                      : "—"}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -672,9 +772,16 @@ export default function SimulationPage() {
 
             {/* Uncertainty-Aware Card */}
             <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col gap-3">
-              <span className="text-xs font-bold text-emerald-400">
-                Uncertainty-Aware Policy (ROP_u)
-              </span>
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold text-emerald-400">
+                  Uncertainty-Aware Policy (s_emp)
+                </span>
+                {bestSimAggPolicy === "emp" && (
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Best Cost
+                  </span>
+                )}
+              </div>
               <div className="flex items-baseline gap-2">
                 <span className="text-2xl font-bold text-emerald-300">
                   {fmtInr(empAgg?.total_cost)}
@@ -683,15 +790,24 @@ export default function SimulationPage() {
               </div>
               <div className="flex flex-col gap-1.5 text-xs text-slate-400 pt-2 border-t border-white/[0.04]">
                 <div className="flex justify-between">
-                  <span>Service Level (Fill Rate):</span>
+                  <span>Fill Rate:</span>
                   <span className="font-mono text-emerald-300 font-semibold">
-                    {fmtPct(empAgg?.service_level, 2)}
+                    {fmtPct(empAgg?.fill_rate ?? empAgg?.service_level, 2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Cycle Service Level (CSL):</span>
+                  <span className="font-mono text-emerald-300 font-semibold">
+                    {fmtPct(empAgg?.CSL ?? empAgg?.csl, 2)}
                   </span>
                 </div>
                 <div className="flex justify-between">
                   <span>Stockout Days Rate:</span>
                   <span className="font-mono text-slate-200">
-                    {fmtPct(empAgg?.stockout_rate_mean, 1)}
+                    {fmtPct(
+                      empAgg?.stockout_day_rate ?? empAgg?.stockout_rate_mean,
+                      1,
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between">
@@ -728,9 +844,11 @@ export default function SimulationPage() {
                 {costDiff > 0 ? `+${fmtInr(costDiff)}` : fmtInr(costDiff)}
               </span>
               <span className="text-[11px] text-slate-400 ml-2">
-                ({costDiff < 0
+                (
+                {costDiff < 0
                   ? "Uncertainty-aware saved money overall"
-                  : "Uncertainty-aware incurred higher costs"})
+                  : "Uncertainty-aware incurred higher costs"}
+                )
               </span>
             </div>
             <p className="text-[10px] text-slate-500 max-w-md">
@@ -870,7 +988,8 @@ export default function SimulationPage() {
                     Cost vs. Fill Rate Tradeoff Curves
                   </h3>
                   <p className="text-[11px] text-slate-400 mt-0.5">
-                    Service level sweep (0.80–0.99 in 0.02 steps) evaluating ROP and paired simulation across inventory policies.
+                    Service level sweep (0.80–0.99 in 0.02 steps) evaluating ROP
+                    and paired simulation across inventory policies.
                   </p>
                 </div>
                 {skusList.length > 1 && (
@@ -893,10 +1012,7 @@ export default function SimulationPage() {
                 )}
               </div>
 
-              <CostVsFillRateChart
-                skuId={chartSkuId}
-                sweep={activeSkuSweep}
-              />
+              <CostVsFillRateChart skuId={chartSkuId} sweep={activeSkuSweep} />
             </div>
           )}
 
@@ -916,43 +1032,31 @@ export default function SimulationPage() {
                       scope="col"
                       className="px-3 py-2.5 text-right font-sans"
                     >
-                      Total Cost (Det)
+                      Deterministic (s_det)
                     </th>
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-right font-sans text-sky-400"
                     >
-                      Total Cost (Qua)
+                      Quantile (s_quant)
                     </th>
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-right font-sans text-emerald-400"
                     >
-                      Total Cost (Emp)
+                      Empirical (s_emp)
                     </th>
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-right font-sans"
                     >
-                      Mean Diff
+                      Mean Diff (Emp - Det)
                     </th>
                     <th
                       scope="col"
                       className="px-3 py-2.5 text-right font-sans"
                     >
-                      % Scenarios Cheaper
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 py-2.5 text-right font-sans"
-                    >
-                      Fill Rate (Det / Qua / Emp)
-                    </th>
-                    <th
-                      scope="col"
-                      className="px-3 py-2.5 text-right font-sans"
-                    >
-                      Stockout Units (Det / Qua / Emp)
+                      % Cheaper
                     </th>
                     <th
                       scope="col"
@@ -966,6 +1070,34 @@ export default function SimulationPage() {
                   {skusList.map((sku) => {
                     const diff = sku.paired?.mean_total_cost_diff ?? 0;
                     const isExpanded = expandedSku === sku.sku_id;
+                    const pDet = sku.s_det || sku.deterministic;
+                    const pQua = sku.s_quant || sku.quantile;
+                    const pEmp = sku.s_emp || sku.uncertainty_aware;
+
+                    const skuCosts = [
+                      {
+                        id: "det",
+                        cost: pDet?.total_cost ?? pDet?.total_cost_mean,
+                      },
+                      {
+                        id: "qua",
+                        cost: pQua?.total_cost ?? pQua?.total_cost_mean,
+                      },
+                      {
+                        id: "emp",
+                        cost: pEmp?.total_cost ?? pEmp?.total_cost_mean,
+                      },
+                    ].filter((c) => c.cost != null && !isNaN(c.cost));
+                    const minSkuCost =
+                      skuCosts.length > 0
+                        ? Math.min(...skuCosts.map((c) => c.cost))
+                        : null;
+                    const bestSkuPolicy =
+                      minSkuCost != null
+                        ? skuCosts.find(
+                            (c) => Math.abs(c.cost - minSkuCost) < 1e-4,
+                          )?.id
+                        : null;
 
                     return (
                       <>
@@ -980,21 +1112,127 @@ export default function SimulationPage() {
                             {sku.sku_id}
                           </td>
                           <td className="px-3 py-3 text-right">
-                            {fmtInr(sku.deterministic?.total_cost_mean)}
+                            <div className="flex flex-col items-end gap-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-slate-100">
+                                  {fmtInr(
+                                    pDet?.total_cost ?? pDet?.total_cost_mean,
+                                  )}
+                                </span>
+                                {bestSkuPolicy === "det" && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                    Best Cost
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-400 font-sans">
+                                Fill:{" "}
+                                {fmtPct(
+                                  pDet?.fill_rate ?? pDet?.service_level_mean,
+                                  1,
+                                )}{" "}
+                                · CSL:{" "}
+                                {fmtPct(
+                                  pDet?.CSL ?? pDet?.csl ?? pDet?.csl_mean,
+                                  1,
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-sans">
+                                Stockout:{" "}
+                                {fmtPct(
+                                  pDet?.stockout_day_rate ??
+                                    pDet?.stockout_rate_mean,
+                                  1,
+                                )}{" "}
+                                ({fmtNum(pDet?.stockout_units_mean, 0)} u)
+                              </div>
+                            </div>
                           </td>
-                          <td className="px-3 py-3 text-right font-semibold text-sky-300">
-                            {sku.quantile ? fmtInr(sku.quantile.total_cost_mean) : "—"}
+                          <td className="px-3 py-3 text-right">
+                            {pQua ? (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-sky-300">
+                                    {fmtInr(
+                                      pQua.total_cost ?? pQua.total_cost_mean,
+                                    )}
+                                  </span>
+                                  {bestSkuPolicy === "qua" && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                      Best Cost
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-sky-400/80 font-sans">
+                                  Fill:{" "}
+                                  {fmtPct(
+                                    pQua.fill_rate ?? pQua.service_level_mean,
+                                    1,
+                                  )}{" "}
+                                  · CSL:{" "}
+                                  {fmtPct(
+                                    pQua.CSL ?? pQua.csl ?? pQua.csl_mean,
+                                    1,
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-slate-500 font-sans">
+                                  Stockout:{" "}
+                                  {fmtPct(
+                                    pQua.stockout_day_rate ??
+                                      pQua.stockout_rate_mean,
+                                    1,
+                                  )}{" "}
+                                  ({fmtNum(pQua.stockout_units_mean, 0)} u)
+                                </div>
+                              </div>
+                            ) : (
+                              "—"
+                            )}
                           </td>
-                          <td className="px-3 py-3 text-right font-bold text-emerald-300">
-                            {fmtInr(sku.uncertainty_aware?.total_cost_mean)}
+                          <td className="px-3 py-3 text-right">
+                            <div className="flex flex-col items-end gap-0.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-bold text-emerald-300">
+                                  {fmtInr(
+                                    pEmp?.total_cost ?? pEmp?.total_cost_mean,
+                                  )}
+                                </span>
+                                {bestSkuPolicy === "emp" && (
+                                  <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                    Best Cost
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-emerald-400/80 font-sans">
+                                Fill:{" "}
+                                {fmtPct(
+                                  pEmp?.fill_rate ?? pEmp?.service_level_mean,
+                                  1,
+                                )}{" "}
+                                · CSL:{" "}
+                                {fmtPct(
+                                  pEmp?.CSL ?? pEmp?.csl ?? pEmp?.csl_mean,
+                                  1,
+                                )}
+                              </div>
+                              <div className="text-[10px] text-slate-500 font-sans">
+                                Stockout:{" "}
+                                {fmtPct(
+                                  pEmp?.stockout_day_rate ??
+                                    pEmp?.stockout_rate_mean,
+                                  1,
+                                )}{" "}
+                                ({fmtNum(pEmp?.stockout_units_mean, 0)} u)
+                              </div>
+                            </div>
                           </td>
                           <td className="px-3 py-3 text-right">
                             <span
                               className={
                                 diff < 0
-                                  ? "text-emerald-400"
+                                  ? "text-emerald-400 font-semibold"
                                   : diff > 0
-                                    ? "text-rose-400"
+                                    ? "text-rose-400 font-semibold"
                                     : "text-slate-400"
                               }
                             >
@@ -1005,31 +1243,6 @@ export default function SimulationPage() {
                             {fmtPct(
                               sku.paired
                                 ?.share_scenarios_uncertainty_aware_cheaper,
-                              1,
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-right">
-                            {fmtPct(sku.deterministic?.service_level_mean, 1)} /{" "}
-                            <span className="text-sky-300 font-semibold">
-                              {sku.quantile ? fmtPct(sku.quantile?.service_level_mean, 1) : "—"}
-                            </span>{" "}
-                            /{" "}
-                            <span className="text-emerald-300 font-semibold">
-                              {fmtPct(
-                                sku.uncertainty_aware?.service_level_mean,
-                                1,
-                              )}
-                            </span>
-                          </td>
-                          <td className="px-3 py-3 text-right">
-                            {fmtNum(sku.deterministic?.stockout_units_mean, 1)}{" "}
-                            /{" "}
-                            <span className="text-sky-300">
-                              {sku.quantile ? fmtNum(sku.quantile?.stockout_units_mean, 1) : "—"}
-                            </span>{" "}
-                            /{" "}
-                            {fmtNum(
-                              sku.uncertainty_aware?.stockout_units_mean,
                               1,
                             )}
                           </td>
@@ -1053,7 +1266,7 @@ export default function SimulationPage() {
                             className="bg-slate-900/40"
                           >
                             <td
-                              colSpan={9}
+                              colSpan={7}
                               className="px-5 py-4 text-xs font-sans text-slate-300"
                             >
                               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -1160,10 +1373,11 @@ export default function SimulationPage() {
             </div>
             <p className="text-xs text-slate-400 max-w-3xl">
               Holds out the last 28 days of actual demand; fits the forecast and
-              sets EOQ and each policy on earlier days only; simulates each policy
-              once on the actual held-out demand using each SKU&apos;s rounded lead time
-              and starting inventory = ROP. This removes the circularity of scoring
-              policies on the same bootstrap that built them.
+              sets EOQ and each policy on earlier days only; simulates each
+              policy once on the actual held-out demand using each SKU&apos;s
+              rounded lead time and starting inventory = ROP. This removes the
+              circularity of scoring policies on the same bootstrap that built
+              them.
             </p>
           </div>
 
@@ -1187,7 +1401,9 @@ export default function SimulationPage() {
               <RotateCcw size={14} />
             )}
             <span>
-              {hasReplay ? "Re-run Replay on Actual Demand" : "Run Replay on Actual Demand"}
+              {hasReplay
+                ? "Re-run Replay on Actual Demand"
+                : "Run Replay on Actual Demand"}
             </span>
           </button>
         </div>
@@ -1226,9 +1442,16 @@ export default function SimulationPage() {
               {/* Deterministic Replay Card */}
               <div className="bg-[#171923] border border-white/[0.06] rounded-2xl p-5 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-slate-300">
-                    Deterministic Policy (ROP_d)
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-slate-300">
+                      Deterministic Policy (s_det)
+                    </span>
+                    {bestReplayAggPolicy === "det" && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Best Cost
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">
                     det
                   </span>
@@ -1245,15 +1468,26 @@ export default function SimulationPage() {
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
+                    <span className="text-xs text-slate-400">
+                      Cycle Service Level (CSL):
+                    </span>
+                    <span className="text-sm font-mono font-semibold text-slate-200">
+                      {fmtPct(replayDet?.CSL ?? replayDet?.csl, 2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
                     <span className="text-xs text-slate-400">Total Cost:</span>
                     <span className="text-sm font-mono font-bold text-slate-100">
                       {fmtInr(replayDet?.total_cost)}
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
-                    <span className="text-xs text-slate-400">Stockout Days:</span>
+                    <span className="text-xs text-slate-400">
+                      Stockout Days:
+                    </span>
                     <span className="text-xs font-mono font-semibold text-slate-200">
-                      {replayDet?.stockout_days ?? 0} days
+                      {replayDet?.stockout_days ?? 0} days (
+                      {fmtPct(replayDet?.stockout_day_rate, 1)})
                     </span>
                   </div>
                 </div>
@@ -1265,7 +1499,9 @@ export default function SimulationPage() {
                   <div className="flex justify-between items-baseline">
                     <span className="text-xs text-slate-400">Fill Rate:</span>
                     <span className="text-xs font-mono text-indigo-300">
-                      {detAgg ? fmtPct(detAgg.service_level, 2) : "—"}
+                      {detAgg
+                        ? fmtPct(detAgg.fill_rate ?? detAgg.service_level, 2)
+                        : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
@@ -1275,9 +1511,17 @@ export default function SimulationPage() {
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
-                    <span className="text-xs text-slate-400">Stockout Days Rate:</span>
+                    <span className="text-xs text-slate-400">
+                      Stockout Days Rate:
+                    </span>
                     <span className="text-xs font-mono text-slate-300">
-                      {detAgg ? fmtPct(detAgg.stockout_rate_mean, 1) : "—"}
+                      {detAgg
+                        ? fmtPct(
+                            detAgg.stockout_day_rate ??
+                              detAgg.stockout_rate_mean,
+                            1,
+                          )
+                        : "—"}
                     </span>
                   </div>
                 </div>
@@ -1286,9 +1530,16 @@ export default function SimulationPage() {
               {/* Quantile Replay Card */}
               <div className="bg-[#171923] border border-sky-500/20 rounded-2xl p-5 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-sky-400">
-                    Quantile Policy (ROP_q)
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-sky-400">
+                      Quantile Policy (s_quant)
+                    </span>
+                    {bestReplayAggPolicy === "qua" && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Best Cost
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-sky-950 text-sky-400">
                     quantile
                   </span>
@@ -1305,15 +1556,29 @@ export default function SimulationPage() {
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
+                    <span className="text-xs text-slate-400">
+                      Cycle Service Level (CSL):
+                    </span>
+                    <span className="text-sm font-mono font-semibold text-sky-200">
+                      {replayQua
+                        ? fmtPct(replayQua.CSL ?? replayQua.csl, 2)
+                        : "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
                     <span className="text-xs text-slate-400">Total Cost:</span>
                     <span className="text-sm font-mono font-bold text-sky-300">
                       {replayQua ? fmtInr(replayQua.total_cost) : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
-                    <span className="text-xs text-slate-400">Stockout Days:</span>
+                    <span className="text-xs text-slate-400">
+                      Stockout Days:
+                    </span>
                     <span className="text-xs font-mono font-semibold text-slate-200">
-                      {replayQua ? `${replayQua.stockout_days} days` : "—"}
+                      {replayQua
+                        ? `${replayQua.stockout_days} days (${fmtPct(replayQua.stockout_day_rate, 1)})`
+                        : "—"}
                     </span>
                   </div>
                 </div>
@@ -1325,7 +1590,9 @@ export default function SimulationPage() {
                   <div className="flex justify-between items-baseline">
                     <span className="text-xs text-slate-400">Fill Rate:</span>
                     <span className="text-xs font-mono text-sky-300">
-                      {quaAgg ? fmtPct(quaAgg.service_level, 2) : "—"}
+                      {quaAgg
+                        ? fmtPct(quaAgg.fill_rate ?? quaAgg.service_level, 2)
+                        : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
@@ -1335,9 +1602,17 @@ export default function SimulationPage() {
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
-                    <span className="text-xs text-slate-400">Stockout Days Rate:</span>
+                    <span className="text-xs text-slate-400">
+                      Stockout Days Rate:
+                    </span>
                     <span className="text-xs font-mono text-slate-300">
-                      {quaAgg ? fmtPct(quaAgg.stockout_rate_mean, 1) : "—"}
+                      {quaAgg
+                        ? fmtPct(
+                            quaAgg.stockout_day_rate ??
+                              quaAgg.stockout_rate_mean,
+                            1,
+                          )
+                        : "—"}
                     </span>
                   </div>
                 </div>
@@ -1346,9 +1621,16 @@ export default function SimulationPage() {
               {/* Uncertainty-Aware Replay Card */}
               <div className="bg-[#171923] border border-emerald-500/20 rounded-2xl p-5 flex flex-col gap-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-emerald-400">
-                    Uncertainty-Aware Policy (ROP_u)
-                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-bold text-emerald-400">
+                      Uncertainty-Aware Policy (s_emp)
+                    </span>
+                    {bestReplayAggPolicy === "emp" && (
+                      <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                        Best Cost
+                      </span>
+                    )}
+                  </div>
                   <span className="text-[10px] uppercase font-mono px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-400">
                     unc
                   </span>
@@ -1365,15 +1647,26 @@ export default function SimulationPage() {
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
+                    <span className="text-xs text-slate-400">
+                      Cycle Service Level (CSL):
+                    </span>
+                    <span className="text-sm font-mono font-semibold text-emerald-200">
+                      {fmtPct(replayEmp?.CSL ?? replayEmp?.csl, 2)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-baseline">
                     <span className="text-xs text-slate-400">Total Cost:</span>
                     <span className="text-sm font-mono font-bold text-emerald-300">
                       {fmtInr(replayEmp?.total_cost)}
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
-                    <span className="text-xs text-slate-400">Stockout Days:</span>
+                    <span className="text-xs text-slate-400">
+                      Stockout Days:
+                    </span>
                     <span className="text-xs font-mono font-semibold text-slate-200">
-                      {replayEmp?.stockout_days ?? 0} days
+                      {replayEmp?.stockout_days ?? 0} days (
+                      {fmtPct(replayEmp?.stockout_day_rate, 1)})
                     </span>
                   </div>
                 </div>
@@ -1385,7 +1678,9 @@ export default function SimulationPage() {
                   <div className="flex justify-between items-baseline">
                     <span className="text-xs text-slate-400">Fill Rate:</span>
                     <span className="text-xs font-mono text-emerald-300">
-                      {empAgg ? fmtPct(empAgg.service_level, 2) : "—"}
+                      {empAgg
+                        ? fmtPct(empAgg.fill_rate ?? empAgg.service_level, 2)
+                        : "—"}
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
@@ -1395,9 +1690,17 @@ export default function SimulationPage() {
                     </span>
                   </div>
                   <div className="flex justify-between items-baseline">
-                    <span className="text-xs text-slate-400">Stockout Days Rate:</span>
+                    <span className="text-xs text-slate-400">
+                      Stockout Days Rate:
+                    </span>
                     <span className="text-xs font-mono text-slate-300">
-                      {empAgg ? fmtPct(empAgg.stockout_rate_mean, 1) : "—"}
+                      {empAgg
+                        ? fmtPct(
+                            empAgg.stockout_day_rate ??
+                              empAgg.stockout_rate_mean,
+                            1,
+                          )
+                        : "—"}
                     </span>
                   </div>
                 </div>
@@ -1411,7 +1714,7 @@ export default function SimulationPage() {
                   Per-SKU Replay Performance on Actual Held-Out Demand
                 </span>
                 <span className="text-[11px] text-slate-500">
-                  Format: Det / Qua / Emp
+                  Three-policy comparison: s_det / s_quant / s_emp
                 </span>
               </div>
 
@@ -1424,33 +1727,27 @@ export default function SimulationPage() {
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2.5 text-right font-sans text-amber-300"
+                        className="px-3 py-2.5 text-right font-sans"
                       >
-                        Actual Fill Rate
+                        Deterministic (s_det)
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2.5 text-right font-sans text-amber-300"
+                        className="px-3 py-2.5 text-right font-sans text-sky-400"
                       >
-                        Actual Total Cost
+                        Quantile (s_quant)
                       </th>
                       <th
                         scope="col"
-                        className="px-3 py-2.5 text-right font-sans text-amber-300"
+                        className="px-3 py-2.5 text-right font-sans text-emerald-400"
                       >
-                        Actual Stockout Days
-                      </th>
-                      <th
-                        scope="col"
-                        className="px-3 py-2.5 text-right font-sans text-indigo-300"
-                      >
-                        Simulated Fill Rate
+                        Empirical (s_emp)
                       </th>
                       <th
                         scope="col"
                         className="px-3 py-2.5 text-right font-sans text-indigo-300"
                       >
-                        Simulated Total Cost
+                        Simulated Cost (Det / Qua / Emp)
                       </th>
                     </tr>
                   </thead>
@@ -1458,6 +1755,26 @@ export default function SimulationPage() {
                     {replaySkus.map((rSku) => {
                       const simSku = simSkuMap.get(rSku.sku_id);
                       const isOk = rSku.status === "ok";
+                      const rDet = rSku.s_det || rSku.deterministic || rSku.det;
+                      const rQua = rSku.s_quant || rSku.quantile;
+                      const rEmp =
+                        rSku.s_emp || rSku.uncertainty_aware || rSku.unc;
+
+                      const skuReplayCosts = [
+                        { id: "det", cost: rDet?.total_cost },
+                        { id: "qua", cost: rQua?.total_cost },
+                        { id: "emp", cost: rEmp?.total_cost },
+                      ].filter((c) => c.cost != null && !isNaN(c.cost));
+                      const minReplayCost =
+                        skuReplayCosts.length > 0
+                          ? Math.min(...skuReplayCosts.map((c) => c.cost))
+                          : null;
+                      const bestReplayPolicy =
+                        minReplayCost != null
+                          ? skuReplayCosts.find(
+                              (c) => Math.abs(c.cost - minReplayCost) < 1e-4,
+                            )?.id
+                          : null;
 
                       return (
                         <tr
@@ -1468,19 +1785,27 @@ export default function SimulationPage() {
                             {rSku.sku_id}
                           </td>
                           <td className="px-3 py-3 text-right">
-                            {isOk ? (
-                              <span>
-                                {fmtPct(rSku.deterministic?.fill_rate, 1)} /{" "}
-                                <span className="text-sky-300 font-semibold">
-                                  {rSku.quantile
-                                    ? fmtPct(rSku.quantile.fill_rate, 1)
-                                    : "—"}
-                                </span>{" "}
-                                /{" "}
-                                <span className="text-emerald-300 font-semibold">
-                                  {fmtPct(rSku.uncertainty_aware?.fill_rate, 1)}
-                                </span>
-                              </span>
+                            {isOk && rDet ? (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-slate-100">
+                                    {fmtInr(rDet.total_cost)}
+                                  </span>
+                                  {bestReplayPolicy === "det" && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                      Best Cost
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-amber-300/90 font-sans">
+                                  Fill: {fmtPct(rDet.fill_rate, 1)} · CSL:{" "}
+                                  {fmtPct(rDet.CSL ?? rDet.csl, 1)}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-sans">
+                                  Stockout: {rDet.stockout_days ?? 0}d (
+                                  {fmtPct(rDet.stockout_day_rate, 1)})
+                                </div>
+                              </div>
                             ) : (
                               <span className="text-slate-500 italic">
                                 {rSku.status}
@@ -1488,66 +1813,53 @@ export default function SimulationPage() {
                             )}
                           </td>
                           <td className="px-3 py-3 text-right">
-                            {isOk ? (
-                              <span>
-                                {fmtInr(rSku.deterministic?.total_cost)} /{" "}
-                                <span className="text-sky-300">
-                                  {rSku.quantile
-                                    ? fmtInr(rSku.quantile.total_cost)
-                                    : "—"}
-                                </span>{" "}
-                                /{" "}
-                                <span className="text-emerald-300 font-semibold">
-                                  {fmtInr(rSku.uncertainty_aware?.total_cost)}
-                                </span>
-                              </span>
+                            {isOk && rQua ? (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-sky-300">
+                                    {fmtInr(rQua.total_cost)}
+                                  </span>
+                                  {bestReplayPolicy === "qua" && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                      Best Cost
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-sky-400/90 font-sans">
+                                  Fill: {fmtPct(rQua.fill_rate, 1)} · CSL:{" "}
+                                  {fmtPct(rQua.CSL ?? rQua.csl, 1)}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-sans">
+                                  Stockout: {rQua.stockout_days ?? 0}d (
+                                  {fmtPct(rQua.stockout_day_rate, 1)})
+                                </div>
+                              </div>
                             ) : (
                               "—"
                             )}
                           </td>
                           <td className="px-3 py-3 text-right">
-                            {isOk ? (
-                              <span>
-                                {rSku.deterministic?.stockout_days ?? 0}d /{" "}
-                                <span className="text-sky-300">
-                                  {rSku.quantile
-                                    ? `${rSku.quantile.stockout_days}d`
-                                    : "—"}
-                                </span>{" "}
-                                /{" "}
-                                <span className="text-emerald-300 font-semibold">
-                                  {rSku.uncertainty_aware?.stockout_days ?? 0}d
-                                </span>
-                              </span>
-                            ) : (
-                              "—"
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-right text-slate-400">
-                            {simSku ? (
-                              <span>
-                                {fmtPct(
-                                  simSku.deterministic?.service_level_mean,
-                                  1,
-                                )}{" "}
-                                /{" "}
-                                <span className="text-sky-300/80">
-                                  {simSku.quantile
-                                    ? fmtPct(
-                                        simSku.quantile?.service_level_mean,
-                                        1,
-                                      )
-                                    : "—"}
-                                </span>{" "}
-                                /{" "}
-                                <span className="text-emerald-300/80">
-                                  {fmtPct(
-                                    simSku.uncertainty_aware
-                                      ?.service_level_mean,
-                                    1,
+                            {isOk && rEmp ? (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-bold text-emerald-300">
+                                    {fmtInr(rEmp.total_cost)}
+                                  </span>
+                                  {bestReplayPolicy === "emp" && (
+                                    <span className="px-1.5 py-0.5 rounded text-[9px] font-sans font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                      Best Cost
+                                    </span>
                                   )}
-                                </span>
-                              </span>
+                                </div>
+                                <div className="text-[10px] text-emerald-400/90 font-sans">
+                                  Fill: {fmtPct(rEmp.fill_rate, 1)} · CSL:{" "}
+                                  {fmtPct(rEmp.CSL ?? rEmp.csl, 1)}
+                                </div>
+                                <div className="text-[10px] text-slate-400 font-sans">
+                                  Stockout: {rEmp.stockout_days ?? 0}d (
+                                  {fmtPct(rEmp.stockout_day_rate, 1)})
+                                </div>
+                              </div>
                             ) : (
                               "—"
                             )}
@@ -1589,9 +1901,10 @@ export default function SimulationPage() {
                 Ready to Replay Policies on Actual Demand
               </span>
               <p className="text-xs text-slate-500">
-                Click &ldquo;Run Replay on Actual Demand&rdquo; to hold out the last 28 days of
-                actual demand, fit forecasts and policies on earlier days only, and evaluate
-                out-of-sample ground truth performance without bootstrap circularity.
+                Click &ldquo;Run Replay on Actual Demand&rdquo; to hold out the
+                last 28 days of actual demand, fit forecasts and policies on
+                earlier days only, and evaluate out-of-sample ground truth
+                performance without bootstrap circularity.
               </p>
             </div>
           </div>

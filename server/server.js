@@ -25,7 +25,11 @@ server.use(requestContext);
 server.use(morgan("dev"));
 
 // (c) helmet()
-server.use(helmet());
+server.use(
+  helmet({
+    crossOriginOpenerPolicy: false,
+  }),
+);
 
 // (d) CORS allowlist from CORS_ORIGINS
 const allowedOrigins = env.CORS_ORIGINS.split(",")
