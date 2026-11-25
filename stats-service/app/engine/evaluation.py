@@ -64,7 +64,7 @@ def evaluate_sku_rolling(
     Evaluates candidate models across the 8 rolling origins:
       - SeasonalNaive, AutoETS, and Naive for all SKUs
       - Plus GlobalLGBM for smooth/erratic SKUs
-      - Plus CrostonSBA for intermittent/lumpy SKUs
+      - Plus CrostonSBA for intermittent SKUs
     For each, computes MAE, RMSE, WAPE (null if sum is 0), MASE (scaled by
     seasonal-naive in-sample error, m=7) and P10-P90 coverage (nominal 80%).
     Chooses model by lowest rolling MASE, tie-breaking on pinball loss.
@@ -82,7 +82,7 @@ def evaluate_sku_rolling(
         demand_class, _, _ = classify_demand(y_arr)
 
     candidate_models = ["SeasonalNaive", "AutoETS", "Naive"]
-    if demand_class in ("intermittent", "lumpy"):
+    if demand_class == "intermittent":
         candidate_models.append("CrostonSBA")
     elif demand_class in ("smooth", "erratic"):
         candidate_models.append("GlobalLGBM")
@@ -263,8 +263,8 @@ def evaluate_sku_rolling(
     }
     chosen_model = min(selectable, key=lambda mod: sel_pinball[mod])
 
-    # For intermittent/lumpy SKUs, if the chosen forecast mean is 0 while the last 90 days contain demand, fall back to CrostonSBA
-    if demand_class in ("intermittent", "lumpy") and "CrostonSBA" in candidate_models:
+    # For intermittent SKUs, if the chosen forecast mean is 0 while the last 90 days contain demand, fall back to CrostonSBA
+    if demand_class == "intermittent" and "CrostonSBA" in candidate_models:
         demand_last_90 = float(np.sum(y_arr[-90:])) if len(y_arr) >= 90 else float(np.sum(y_arr))
         test_chosen_mean = float(np.mean(np.concatenate(preds[chosen_model][5:8])))
         if demand_last_90 > 0.0 and test_chosen_mean <= 1e-9:

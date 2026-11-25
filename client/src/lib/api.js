@@ -31,7 +31,6 @@ export const stockpilotApi = createApi({
     "Optimization",
     "Simulations",
     "Simulation",
-    "Replay",
     "Portfolio",
     "AiSessions",
     "Conversation",
@@ -242,26 +241,6 @@ export const stockpilotApi = createApi({
       ],
     }),
 
-    startReplay: builder.mutation({
-      query: ({ id, body }) => ({
-        url: `/sessions/${id}/replay`,
-        method: "POST",
-        body: body || {},
-      }),
-      invalidatesTags: (result, error, { id }) => [
-        { type: "Session", id },
-        { type: "Replay", id },
-      ],
-    }),
-
-    getReplay: builder.query({
-      query: (id) => ({
-        url: `/sessions/${id}/replay`,
-        method: "GET",
-      }),
-      providesTags: (result, error, id) => [{ type: "Replay", id }],
-    }),
-
     runPortfolio: builder.mutation({
       query: ({ id, body }) => ({
         url: `/sessions/${id}/portfolio`,
@@ -437,8 +416,6 @@ export const {
   useStartSimulationMutation,
   useListSimulationsQuery,
   useGetSimulationQuery,
-  useStartReplayMutation,
-  useGetReplayQuery,
   useRunPortfolioMutation,
   useGetPortfolioQuery,
   useListAiSessionsQuery,

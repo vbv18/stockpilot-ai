@@ -17,8 +17,6 @@ export const COPY = {
     "The normal approximation can be unreliable when lead-time demand is small or skewed.",
   noSuperiority:
     "Neither policy is universally better. Compare the measured costs and service levels, including where one policy does worse.",
-  riskCriteria:
-    "Risk flags are screening criteria, not predictions. Stockout tolerance = 1 minus the target service level.",
   simulationDisclaimer:
     "Simulated outcomes depend on the assumptions and the scenario method (lost sales, daily review, identical demand scenarios and starting inventory for both policies). They are not guaranteed future results.",
   decisionSupport:

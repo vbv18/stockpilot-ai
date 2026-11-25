@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
 import {
-  AlertTriangle,
   ArrowRight,
   BarChart3,
   Clock,
@@ -10,7 +9,6 @@ import {
   LineChart,
   RefreshCw,
   Scale,
-  ShieldAlert,
   Sparkles,
   TrendingDown,
   Zap,
@@ -20,7 +18,6 @@ import {
   useGetOptimizationQuery,
   useListSimulationsQuery,
   useGetSimulationQuery,
-  useGetReplayQuery,
   useGetPortfolioQuery,
 } from "../../lib/api.js";
 import { fmtInr, fmtNum, fmtPct } from "../../lib/format.js";
@@ -62,12 +59,6 @@ export default function SummaryPage() {
   );
 
   const {
-    data: replayData,
-    isLoading: isReplayLoading,
-    refetch: refetchReplay,
-  } = useGetReplayQuery(sessionId);
-
-  const {
     data: portData,
     isLoading: isPortLoading,
     refetch: refetchPortfolio,
@@ -78,7 +69,6 @@ export default function SummaryPage() {
     isOptLoading ||
     isSimListLoading ||
     isSimLoading ||
-    isReplayLoading ||
     isPortLoading;
 
   const handleRefreshAll = () => {
@@ -86,7 +76,6 @@ export default function SummaryPage() {
     refetchOptimization();
     refetchSimList();
     if (activeSimId) refetchSim();
-    refetchReplay();
     refetchPortfolio();
   };
 
@@ -125,9 +114,6 @@ export default function SummaryPage() {
       if (valid.length > 0) {
         masePct = valid.reduce((a, b) => a + b, 0) / valid.length;
       }
-    }
-    if (masePct == null && maePct != null) {
-      masePct = maePct;
     }
 
     const coverage =
@@ -235,52 +221,10 @@ export default function SummaryPage() {
       }
     }
 
-    // Replay aggregate (Actual Held-Out Demand)
-    const replayRun = replayData?.latest;
-    const replayAgg = replayRun?.aggregate;
-
-    let repSavings = null;
-    if (replayRun?.status === "succeeded" && replayAgg) {
-      const d =
-        replayAgg.s_det || replayAgg.deterministic || replayAgg.det || {};
-      const q = replayAgg.s_quant || replayAgg.quantile || {};
-      const u =
-        replayAgg.s_emp || replayAgg.uncertainty_aware || replayAgg.unc || {};
-
-      const costDet = d.total_cost ?? null;
-      const costQua = q.total_cost ?? null;
-      const costEmp = u.total_cost ?? null;
-
-      const candidates = [
-        { id: "s_det", name: "Deterministic (s_det)", cost: costDet },
-        { id: "s_quant", name: "Quantile (s_quant)", cost: costQua },
-        { id: "s_emp", name: "Empirical (s_emp)", cost: costEmp },
-      ].filter((c) => c.cost != null && Number.isFinite(c.cost));
-
-      if (candidates.length > 0 && costDet != null) {
-        const sorted = [...candidates].sort((a, b) => a.cost - b.cost);
-        const best = sorted[0];
-        const savedAmount = Math.max(0, costDet - best.cost);
-        const savedPct = costDet > 0 ? (savedAmount / costDet) * 100 : 0;
-
-        repSavings = {
-          hasData: true,
-          bestPolicyId: best.id,
-          bestPolicyName: best.name,
-          costDet,
-          bestCost: best.cost,
-          savedAmount,
-          savedPct,
-          policies: candidates,
-        };
-      }
-    }
-
     return {
       sim: simSavings,
-      replay: repSavings,
     };
-  }, [simData, simListData, replayData]);
+  }, [simData, simListData]);
 
   // 4. Portfolio Allocation: Constrained vs Unconstrained Cost & Exact-Solver Gap
   const portfolioSummary = useMemo(() => {
@@ -327,17 +271,6 @@ export default function SummaryPage() {
       minimumFeasibleBudget: res.minimum_feasible_budget,
     };
   }, [portData]);
-
-  // 5. Highest-Risk SKUs (Top 3)
-  const topRiskSkus = useMemo(() => {
-    const rawRisks = optData?.risk || [];
-    if (rawRisks.length === 0) return [];
-
-    const sorted = [...rawRisks].sort(
-      (a, b) => (b.score ?? 0) - (a.score ?? 0),
-    );
-    return sorted.slice(0, 3);
-  }, [optData]);
 
   return (
     <div className="flex flex-col gap-8 max-w-7xl mx-auto pb-12">
@@ -629,63 +562,7 @@ export default function SummaryPage() {
           </div>
         </div>
 
-        {/* KPI 5: Replay Cost Saving vs s_det (Held-out actual history) */}
-        <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col justify-between shadow-lg relative overflow-hidden">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <span className="text-[11px] font-semibold tracking-wider uppercase text-slate-400 flex items-center gap-1.5">
-                <ShieldAlert size={14} className="text-cyan-400" />
-                Actual Replay Saving vs s_det
-              </span>
-              <p className="text-xs text-slate-500 mt-0.5">
-                Tested on actual holdout transactions
-              </p>
-            </div>
-            {policyComparisonSummary.replay && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                {policyComparisonSummary.replay.bestPolicyId}
-              </span>
-            )}
-          </div>
-
-          <div className="mt-4">
-            {policyComparisonSummary.replay ? (
-              <div className="space-y-3">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-2xl font-bold font-mono text-cyan-300">
-                    {fmtInr(policyComparisonSummary.replay.savedAmount)}
-                  </span>
-                  <span className="text-xs text-cyan-400 font-mono font-medium">
-                    (-{fmtNum(policyComparisonSummary.replay.savedPct, 1)}%)
-                  </span>
-                </div>
-
-                <div className="pt-3 border-t border-white/[0.04] text-[11px] text-slate-400 font-mono flex items-center justify-between">
-                  <span>Best policy:</span>
-                  <span className="text-slate-200">
-                    {policyComparisonSummary.replay.bestPolicyName}
-                  </span>
-                </div>
-              </div>
-            ) : (
-              <div className="py-4 text-center">
-                <Clock size={20} className="mx-auto text-slate-600 mb-1.5" />
-                <p className="text-xs text-slate-500">
-                  Historical replay not run yet
-                </p>
-                <Link
-                  to={`/sessions/${sessionId}/simulation`}
-                  className="inline-flex items-center gap-1 text-[11px] font-medium text-indigo-400 hover:text-indigo-300 mt-2"
-                >
-                  <span>Go to Replay in Simulation</span>
-                  <ArrowRight size={11} />
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* KPI 6: Constrained vs Unconstrained Portfolio Cost */}
+        {/* KPI 5: Constrained vs Unconstrained Portfolio Cost */}
         <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-5 flex flex-col justify-between shadow-lg relative overflow-hidden">
           <div className="flex items-start justify-between gap-3">
             <div>
@@ -753,100 +630,6 @@ export default function SummaryPage() {
         </div>
       </div>
 
-      {/* Top 3 Highest-Risk SKUs Section */}
-      <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-6 shadow-lg">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/[0.08] pb-4">
-          <div>
-            <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-              <AlertTriangle size={18} className="text-rose-400" />
-              <span>Three Highest-Risk Inventory SKUs</span>
-            </h2>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Ranked by composite stockout vulnerability, lead-time variance,
-              and forecast uncertainty.
-            </p>
-          </div>
-          <Link
-            to={`/sessions/${sessionId}/optimization`}
-            className="text-xs text-indigo-400 hover:text-indigo-300 font-medium inline-flex items-center gap-1"
-          >
-            <span>View All SKUs in Optimization</span>
-            <ArrowRight size={12} />
-          </Link>
-        </div>
-
-        <div className="mt-5 grid grid-cols-1 md:grid-cols-3 gap-4">
-          {topRiskSkus.length > 0 ? (
-            topRiskSkus.map((r, idx) => {
-              const flags = r.flags || [];
-              const isHigh = r.level === "high";
-              const isMed = r.level === "medium";
-
-              return (
-                <div
-                  key={r.skuId}
-                  onClick={() => {
-                    const foundSku = optData?.result?.skus?.find(
-                      (s) => s.sku_id === r.skuId,
-                    );
-                    if (foundSku) setSelectedSkuForDrawer(foundSku);
-                  }}
-                  className="bg-white/[0.02] border border-white/[0.06] hover:border-white/[0.16] hover:bg-white/[0.04] transition-all rounded-xl p-4 flex flex-col justify-between cursor-pointer group"
-                >
-                  <div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-bold font-mono text-slate-100 group-hover:text-indigo-300 transition-colors">
-                        {r.skuId}
-                      </span>
-                      <span
-                        className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase border ${
-                          isHigh
-                            ? "bg-rose-500/10 text-rose-300 border-rose-500/20"
-                            : isMed
-                              ? "bg-amber-500/10 text-amber-300 border-amber-500/20"
-                              : "bg-emerald-500/10 text-emerald-300 border-emerald-500/20"
-                        }`}
-                      >
-                        {r.level} ({r.score}/100)
-                      </span>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-1.5">
-                      {flags.length > 0 ? (
-                        flags.map((f) => (
-                          <span
-                            key={f.code}
-                            className="px-1.5 py-0.5 bg-slate-900 border border-white/[0.06] rounded text-[10px] font-mono text-slate-400"
-                            title={f.message}
-                          >
-                            {f.code}
-                          </span>
-                        ))
-                      ) : (
-                        <span className="text-[11px] text-slate-500 font-mono">
-                          No active risk flags
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="mt-4 pt-3 border-t border-white/[0.04] flex items-center justify-between text-[11px] text-slate-500">
-                    <span>Rank #{idx + 1} Risk Priority</span>
-                    <span className="text-indigo-400 group-hover:translate-x-0.5 transition-transform">
-                      &rarr;
-                    </span>
-                  </div>
-                </div>
-              );
-            })
-          ) : (
-            <div className="col-span-3 py-6 text-center text-slate-500 text-xs font-mono">
-              Risk assessment requires completing the Optimization stage.
-            </div>
-          )}
-        </div>
-      </div>
-
       {/* Cross-Stage Comparison Table */}
       <div className="bg-[#13151c] border border-white/[0.08] rounded-2xl p-6 shadow-lg">
         <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2 border-b border-white/[0.08] pb-4">
@@ -870,12 +653,6 @@ export default function SummaryPage() {
                 <th scope="col" className="px-4 py-2.5 font-medium text-right">
                   Simulated Service Level
                 </th>
-                <th scope="col" className="px-4 py-2.5 font-medium text-right">
-                  Actual Replay Total Cost
-                </th>
-                <th scope="col" className="px-4 py-2.5 font-medium text-right">
-                  Actual Replay Fill Rate
-                </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.04]">
@@ -898,16 +675,6 @@ export default function SummaryPage() {
                     1,
                   )}
                 </td>
-                <td className="px-4 py-3 text-right text-slate-200">
-                  {fmtInr(policyComparisonSummary.replay?.costDet)}
-                </td>
-                <td className="px-4 py-3 text-right text-slate-300">
-                  {fmtPct(
-                    replayData?.latest?.aggregate?.deterministic?.fill_rate ??
-                      replayData?.latest?.aggregate?.s_det?.fill_rate,
-                    1,
-                  )}
-                </td>
               </tr>
 
               {/* s_quant row */}
@@ -917,12 +684,6 @@ export default function SummaryPage() {
                   {policyComparisonSummary.sim?.bestPolicyId === "s_quant" && (
                     <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                       Best Sim
-                    </span>
-                  )}
-                  {policyComparisonSummary.replay?.bestPolicyId ===
-                    "s_quant" && (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                      Best Replay
                     </span>
                   )}
                 </td>
@@ -946,19 +707,6 @@ export default function SummaryPage() {
                     1,
                   )}
                 </td>
-                <td className="px-4 py-3 text-right text-slate-200">
-                  {fmtInr(
-                    replayData?.latest?.aggregate?.quantile?.total_cost ??
-                      replayData?.latest?.aggregate?.s_quant?.total_cost,
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right text-slate-300">
-                  {fmtPct(
-                    replayData?.latest?.aggregate?.quantile?.fill_rate ??
-                      replayData?.latest?.aggregate?.s_quant?.fill_rate,
-                    1,
-                  )}
-                </td>
               </tr>
 
               {/* s_emp row */}
@@ -968,11 +716,6 @@ export default function SummaryPage() {
                   {policyComparisonSummary.sim?.bestPolicyId === "s_emp" && (
                     <span className="px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
                       Best Sim
-                    </span>
-                  )}
-                  {policyComparisonSummary.replay?.bestPolicyId === "s_emp" && (
-                    <span className="px-1.5 py-0.5 rounded text-[9px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                      Best Replay
                     </span>
                   )}
                 </td>
@@ -998,21 +741,6 @@ export default function SummaryPage() {
                     1,
                   )}
                 </td>
-                <td className="px-4 py-3 text-right text-slate-200">
-                  {fmtInr(
-                    replayData?.latest?.aggregate?.uncertainty_aware
-                      ?.total_cost ??
-                      replayData?.latest?.aggregate?.s_emp?.total_cost,
-                  )}
-                </td>
-                <td className="px-4 py-3 text-right text-slate-300">
-                  {fmtPct(
-                    replayData?.latest?.aggregate?.uncertainty_aware
-                      ?.fill_rate ??
-                      replayData?.latest?.aggregate?.s_emp?.fill_rate,
-                    1,
-                  )}
-                </td>
               </tr>
             </tbody>
           </table>
@@ -1023,9 +751,6 @@ export default function SummaryPage() {
       {selectedSkuForDrawer && (
         <SkuDrawer
           sku={selectedSkuForDrawer}
-          risk={optData?.risk?.find(
-            (r) => r.skuId === selectedSkuForDrawer.sku_id,
-          )}
           skuAssumptions={null}
           onClose={() => setSelectedSkuForDrawer(null)}
         />

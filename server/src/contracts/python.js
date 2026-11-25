@@ -22,7 +22,6 @@ export const PyDemandClass = z.enum([
   "smooth",
   "erratic",
   "intermittent",
-  "lumpy",
 ]);
 
 export const PySkuSeries = z

@@ -1,1 +1,148 @@
 @import "tailwindcss";
+
+:root {
+  --color-canvas: #faf8f5;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f4efe6;
+  --color-surface-hover: #ece6dc;
+  --color-border-warm: #e5dfd5;
+  --color-border-subtle: #efeae1;
+  --color-text-main: #1c1917;
+  --color-text-secondary: #57534e;
+  --color-text-muted: #78716c;
+  --color-primary: #1e3a5f;
+  --color-primary-hover: #162c48;
+  --shadow-warm-card: 0 1px 3px rgba(44, 34, 24, 0.04), 0 4px 16px rgba(44, 34, 24, 0.03);
+}
+
+body {
+  background-color: var(--color-canvas);
+  color: var(--color-text-main);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Warm bright background mappings for page canvases */
+.bg-\[\#0d0f14\] {
+  background-color: var(--color-canvas) !important;
+}
+
+/* Warm bright white surface mappings for cards and panels */
+.bg-\[\#13151c\] {
+  background-color: var(--color-surface) !important;
+  box-shadow: var(--shadow-warm-card);
+}
+
+.bg-\[\#171923\] {
+  background-color: var(--color-surface-muted) !important;
+}
+
+/* Transparent panel headers */
+.bg-\[\#13151c\]\/60,
+.bg-\[\#13151c\]\/80,
+.bg-\[\#13151c\]\/90 {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+}
+
+.bg-\[\#0d0f14\]\/50,
+.bg-\[\#0d0f14\]\/60,
+.bg-\[\#0d0f14\]\/80 {
+  background-color: rgba(250, 248, 245, 0.88) !important;
+}
+
+/* Inner nested input fields, tags, and sub-panels */
+.bg-slate-900,
+.bg-slate-900\/40,
+.bg-slate-900\/60,
+.bg-slate-900\/80 {
+  background-color: var(--color-surface-muted) !important;
+}
+
+.bg-slate-800,
+.bg-slate-800\/80 {
+  background-color: var(--color-surface-hover) !important;
+}
+
+/* Card and divider warm borders */
+.border-white\/\[0\.02\],
+.border-white\/\[0\.04\],
+.border-white\/\[0\.06\],
+.border-white\/\[0\.08\],
+.border-white\/\[0\.1\],
+.border-white\/\[0\.12\],
+.border-white\/\[0\.16\] {
+  border-color: var(--color-border-warm) !important;
+}
+
+.border-slate-800,
+.border-slate-700 {
+  border-color: var(--color-border-warm) !important;
+}
+
+.divide-white\/\[0\.02\],
+.divide-white\/\[0\.04\],
+.divide-white\/\[0\.06\] {
+  border-color: var(--color-border-subtle) !important;
+}
+
+/* High-contrast, warm soothing typography */
+.text-white,
+.text-slate-100 {
+  color: var(--color-text-main) !important;
+}
+
+.text-slate-200,
+.text-slate-300 {
+  color: #292524 !important;
+}
+
+.text-slate-400 {
+  color: var(--color-text-secondary) !important;
+}
+
+.text-slate-500 {
+  color: var(--color-text-muted) !important;
+}
+
+/* Primary actions: maritime slate navy */
+.bg-indigo-600 {
+  background-color: var(--color-primary) !important;
+}
+.hover\:bg-indigo-500:hover {
+  background-color: var(--color-primary-hover) !important;
+}
+.text-indigo-400,
+.text-indigo-300 {
+  color: #1e3a5f !important;
+}
+.border-indigo-500\/20,
+.border-indigo-500\/30 {
+  border-color: rgba(30, 58, 95, 0.22) !important;
+}
+.bg-indigo-500\/10,
+.bg-indigo-600\/10 {
+  background-color: rgba(30, 58, 95, 0.07) !important;
+}
+
+/* Ambient table row hovering */
+.hover\:bg-white\/\[0\.02\]:hover,
+.hover\:bg-white\/\[0\.04\]:hover {
+  background-color: rgba(44, 34, 24, 0.025) !important;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-canvas);
+}
+::-webkit-scrollbar-thumb {
+  background: #d6cfc4;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #bcb3a4;
+}

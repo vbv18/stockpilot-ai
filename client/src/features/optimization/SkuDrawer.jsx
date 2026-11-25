@@ -8,11 +8,10 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { AlertTriangle, CheckCircle, ShieldAlert, X } from "lucide-react";
-import { COPY } from "../../lib/copy.js";
+import { AlertTriangle, X } from "lucide-react";
 import { fmtInr, fmtNum, fmtPct } from "../../lib/format.js";
 
-export function SkuDrawer({ sku, risk, skuAssumptions, onClose }) {
+export function SkuDrawer({ sku, skuAssumptions, onClose }) {
   if (!sku) return null;
 
   const ltd = sku.ltd || {};
@@ -220,15 +219,16 @@ export function SkuDrawer({ sku, risk, skuAssumptions, onClose }) {
             >
               <CartesianGrid
                 strokeDasharray="3 3"
-                stroke="#334155"
-                opacity={0.3}
+                stroke="#e7e2d8"
+                opacity={0.6}
               />
-              <XAxis dataKey="name" stroke="#64748b" fontSize={10} />
-              <YAxis stroke="#64748b" fontSize={10} />
+              <XAxis dataKey="name" stroke="#78716c" fontSize={10} />
+              <YAxis stroke="#78716c" fontSize={10} />
               <Tooltip
                 contentStyle={{
-                  backgroundColor: "#13151c",
-                  borderColor: "rgba(255,255,255,0.1)",
+                  backgroundColor: "#ffffff",
+                  borderColor: "#e7e2d8",
+                  color: "#1c1917",
                   borderRadius: "0.5rem",
                   fontSize: "11px",
                 }}
@@ -273,51 +273,6 @@ export function SkuDrawer({ sku, risk, skuAssumptions, onClose }) {
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </div>
-
-      {/* Risk Flags & Screen Criteria */}
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center justify-between">
-          <span className="text-xs font-semibold text-slate-300">
-            Risk Assessment
-          </span>
-          <span
-            className={`text-[10px] font-semibold px-2 py-0.5 rounded uppercase ${
-              risk?.level === "high"
-                ? "bg-rose-500/20 text-rose-300"
-                : risk?.level === "medium"
-                  ? "bg-amber-500/20 text-amber-300"
-                  : "bg-emerald-500/20 text-emerald-300"
-            }`}
-          >
-            {risk?.level || "low"} risk ({risk?.score || 0} flags)
-          </span>
-        </div>
-
-        {risk?.flags && risk.flags.length > 0 ? (
-          <div className="flex flex-col gap-2">
-            {risk.flags.map((flag, idx) => (
-              <div
-                key={idx}
-                className="bg-rose-500/10 border border-rose-500/20 rounded-xl p-3 flex flex-col gap-1 text-xs"
-              >
-                <div className="flex items-center gap-1.5 text-rose-300 font-semibold">
-                  <ShieldAlert size={14} />
-                  <span>{flag.code.replace(/_/g, " ")}</span>
-                </div>
-                <p className="text-rose-200/80 text-[11px] leading-relaxed">
-                  {flag.message}
-                </p>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 flex items-center gap-2 text-xs text-emerald-300">
-            <CheckCircle size={15} />
-            <span>No screening risk flags triggered for this SKU.</span>
-          </div>
-        )}
-        <p className="text-[10px] text-slate-500 mt-1">{COPY.riskCriteria}</p>
       </div>
 
       {/* Engine Warnings */}

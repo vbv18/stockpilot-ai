@@ -10,7 +10,6 @@ from .engine.evaluation import aggregate, evaluate_series
 from .engine.forecasting import fit_sku, to_sku_forecast
 from .engine.inventory import optimize_sku
 from .engine.meta import RunClock
-from .engine.replay import aggregate_replay, replay_sku
 from .engine.simulation import aggregate as aggregate_simulation, simulate_sku
 from .portfolio import solve_portfolio
 from .schemas import (
@@ -136,22 +135,6 @@ def simulate(req: SimulateRequest) -> SimulateResponse:
         skus=results,
         aggregate=aggregate_simulation(results),
         sweep=sweep_map if sweep_map else None,
-    )
-
-
-@private_router.post("/replay", response_model=ReplayResponse)
-def replay(req: ReplayRequest) -> ReplayResponse:
-    _ensure_unique([s.sku_id for s in req.series])
-    for s in req.series:
-        if s.sku_id not in req.assumptions:
-            raise HTTPException(status_code=422, detail=f"Missing assumptions for {s.sku_id}")
-    clock = RunClock()
-    results = [replay_sku(s, req.params, req.assumptions[s.sku_id]) for s in req.series]
-    return ReplayResponse(
-        run_meta=clock.meta(req.params.seed),
-        params=req.params,
-        skus=results,
-        aggregate=aggregate_replay(results),
     )
 
 

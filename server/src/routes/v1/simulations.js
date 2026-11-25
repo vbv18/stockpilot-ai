@@ -10,7 +10,6 @@ import { AssumptionSetModel } from "../../models/assumptionSet.model.js";
 import { OptimizationRunModel } from "../../models/optimizationRun.model.js";
 import { SimulationRunModel } from "../../models/simulationRun.model.js";
 import { enqueueJob } from "../../services/jobRunner.js";
-import { computeSkuRisk } from "../../services/risk.js";
 import {
   getSessionOwned,
   requireStatus,
@@ -18,10 +17,8 @@ import {
   transition,
 } from "../../services/sessionService.js";
 import { ACTION_ALLOWED_FROM } from "../../services/stateMachine.js";
-import replayRouter from "./replay.js";
 
 const router = Router({ mergeParams: true });
-router.use("/replay", replayRouter);
 
 const SimulationIdParam = IdParam.extend({
   simulationId: z.string().regex(/^[a-fA-F0-9]{24}$/),
@@ -180,24 +177,6 @@ router.get(
         }
       }
 
-      const assumptionDoc = optRun
-        ? await AssumptionSetModel.findById(optRun.assumptionSetId)
-        : null;
-      const skusMap =
-        assumptionDoc?.skus instanceof Map
-          ? Object.fromEntries(assumptionDoc.skus)
-          : assumptionDoc?.skus || {};
-
-      const risk = (optRun?.result?.skus || []).map((optSku) => {
-        const skuAssump = skusMap[optSku.sku_id];
-        return computeSkuRisk({
-          opt: optSku,
-          evaluation: evalBySku.get(optSku.sku_id) || null,
-          simulation: simBySku.get(optSku.sku_id) || null,
-          targetServiceLevel: skuAssump?.service_level ?? 0.95,
-        });
-      });
-
       return res.status(200).json({
         data: {
           run: {
@@ -213,7 +192,6 @@ router.get(
           },
           result: simRun.policyResults || null,
           sweep: simRun.sweep || simRun.policyResults?.sweep || null,
-          risk,
           notes: SIMULATION_NOTES,
         },
       });

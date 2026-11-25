@@ -64,8 +64,6 @@ export default function OptimizationPage() {
 
   const assumptions = optData?.assumptions;
   const result = optData?.result;
-  const risks = optData?.risk || [];
-  const riskBySku = new Map(risks.map((r) => [r.skuId, r]));
   const simSkus = simData?.result?.skus || [];
   const simSkuBySku = new Map(simSkus.map((s) => [s.sku_id, s]));
 
@@ -212,8 +210,7 @@ export default function OptimizationPage() {
                 Replenishment Recommendations by SKU
               </h3>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Click any row or risk badge to open detailed intermediates and
-                percentiles.
+                Click any row to open detailed intermediates and percentiles.
               </p>
             </div>
           </div>
@@ -258,14 +255,10 @@ export default function OptimizationPage() {
                   <th scope="col" className="px-3 py-2.5 text-right font-sans">
                     Gap (Emp - Det)
                   </th>
-                  <th scope="col" className="px-3 py-2.5 font-sans text-center">
-                    Risk Screen
-                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/[0.02] text-slate-300">
                 {okSkus.map((sku) => {
-                  const rk = riskBySku.get(sku.sku_id);
                   const gap = sku.rop_gap ?? 0;
                   const sDet = sku.s_det ?? sku.rop_deterministic;
                   const sQuant = sku.s_quant ?? sku.rop_quantile;
@@ -296,20 +289,6 @@ export default function OptimizationPage() {
                       const minC = Math.min(...candidates.map((c) => c.cost));
                       bestPolicy = candidates.find(
                         (c) => Math.abs(c.cost - minC) < 1e-4,
-                      )?.id;
-                    }
-                  } else {
-                    const ropCandidates = [
-                      { id: "s_det", val: sDet },
-                      { id: "s_quant", val: sQuant },
-                      { id: "s_emp", val: sEmp },
-                    ].filter((c) => c.val != null && !isNaN(c.val));
-                    if (ropCandidates.length > 0) {
-                      const minVal = Math.min(
-                        ...ropCandidates.map((c) => c.val),
-                      );
-                      bestPolicy = ropCandidates.find(
-                        (c) => c.val === minVal,
                       )?.id;
                     }
                   }
@@ -378,19 +357,6 @@ export default function OptimizationPage() {
                           {gap > 0 ? `+${gap}` : gap}
                         </span>
                       </td>
-                      <td className="px-3 py-3 text-center">
-                        <span
-                          className={`inline-block px-2 py-0.5 rounded text-[10px] font-sans font-medium uppercase ${
-                            rk?.level === "high"
-                              ? "bg-rose-500/20 text-rose-300"
-                              : rk?.level === "medium"
-                                ? "bg-amber-500/20 text-amber-300"
-                                : "bg-emerald-500/20 text-emerald-300"
-                          }`}
-                        >
-                          {rk?.level || "low"}
-                        </span>
-                      </td>
                     </tr>
                   );
                 })}
@@ -442,7 +408,6 @@ export default function OptimizationPage() {
       {selectedSkuForDrawer && (
         <SkuDrawer
           sku={selectedSkuForDrawer}
-          risk={riskBySku.get(selectedSkuForDrawer.sku_id)}
           skuAssumptions={assumptions?.skus?.[selectedSkuForDrawer.sku_id]}
           onClose={() => setSelectedSkuForDrawer(null)}
         />

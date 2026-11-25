@@ -17,7 +17,7 @@ SeedT = Annotated[int, Field(ge=0, le=2147483647)]
 
 SkuStatus = Literal["ok", "insufficient_history", "no_demand", "model_failed"]
 IntervalStatus = Literal["ok", "insufficient_residuals", "not_computed"]
-DemandClass = Literal["smooth", "erratic", "intermittent", "lumpy"]
+DemandClass = Literal["smooth", "erratic", "intermittent"]
 
 
 class SkuSeries(Strict):

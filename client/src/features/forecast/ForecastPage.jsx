@@ -551,7 +551,7 @@ export default function ForecastPage() {
               </h3>
               <p className="text-xs text-slate-400 mt-0.5">
                 Evaluated with Seasonal Naive (m=7), AutoETS, and Croston SBA
-                (for intermittent/lumpy patterns). The model with the lowest
+                (for intermittent patterns). The model with the lowest
                 rolling MASE is chosen per SKU to feed the interval bootstrap.
               </p>
             </div>

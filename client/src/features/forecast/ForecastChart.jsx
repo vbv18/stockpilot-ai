@@ -223,8 +223,9 @@ export function ForecastChart({
             <YAxis tickLine={false} stroke="#64748b" fontSize={10} />
             <Tooltip
               contentStyle={{
-                backgroundColor: "#13151c",
-                borderColor: "rgba(255,255,255,0.1)",
+                backgroundColor: "#ffffff",
+                borderColor: "#e5dfd5",
+                color: "#1c1917",
                 borderRadius: "0.75rem",
                 fontSize: "11px",
               }}

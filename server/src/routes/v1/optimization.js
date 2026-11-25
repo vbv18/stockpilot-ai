@@ -9,7 +9,6 @@ import { ForecastRunModel } from "../../models/forecastRun.model.js";
 import { OptimizationRunModel } from "../../models/optimizationRun.model.js";
 import { SimulationRunModel } from "../../models/simulationRun.model.js";
 import { enqueueJob } from "../../services/jobRunner.js";
-import { computeSkuRisk } from "../../services/risk.js";
 import {
   getSessionOwned,
   requireStatus,
@@ -110,44 +109,6 @@ router.get("/", validate({ params: IdParam }), async (req, res, next) => {
       session.activeAssumptionSetId?.toString() !==
       run.assumptionSetId.toString();
 
-    // For risk computation:
-    const forecastRun = await ForecastRunModel.findById(run.forecastRunId);
-    const evalBySku = new Map();
-    if (forecastRun?.result?.evaluation?.skus) {
-      for (const e of forecastRun.result.evaluation.skus) {
-        evalBySku.set(e.sku_id, e);
-      }
-    }
-
-    // Check active simulation run
-    let simBySku = new Map();
-    if (session.activeSimulationRunId) {
-      const simRun = await SimulationRunModel.findOne({
-        _id: session.activeSimulationRunId,
-        optimizationRunId: run._id,
-      });
-      if (simRun?.policyResults?.skus) {
-        for (const s of simRun.policyResults.skus) {
-          simBySku.set(s.sku_id, s);
-        }
-      }
-    }
-
-    const skusMap =
-      assumptionDoc.skus instanceof Map
-        ? Object.fromEntries(assumptionDoc.skus)
-        : assumptionDoc.skus || {};
-
-    const risk = (run.result?.skus || []).map((optSku) => {
-      const skuAssump = skusMap[optSku.sku_id];
-      return computeSkuRisk({
-        opt: optSku,
-        evaluation: evalBySku.get(optSku.sku_id) || null,
-        simulation: simBySku.get(optSku.sku_id) || null,
-        targetServiceLevel: skuAssump?.service_level ?? 0.95,
-      });
-    });
-
     return res.status(200).json({
       data: {
         run: {
@@ -161,7 +122,6 @@ router.get("/", validate({ params: IdParam }), async (req, res, next) => {
         },
         assumptions: toAssumptionSetDto(assumptionDoc),
         result: run.result,
-        risk,
         stale,
       },
     });

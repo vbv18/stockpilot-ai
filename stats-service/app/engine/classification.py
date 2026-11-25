@@ -6,7 +6,7 @@ import numpy as np
 ADI_CUTOFF = 1.32
 CV2_CUTOFF = 0.49
 
-DemandClass = Literal["smooth", "erratic", "intermittent", "lumpy"]
+DemandClass = Literal["smooth", "erratic", "intermittent"]
 
 
 def classify_demand(y: np.ndarray) -> tuple[DemandClass, float, float]:
@@ -16,11 +16,10 @@ def classify_demand(y: np.ndarray) -> tuple[DemandClass, float, float]:
       - ADI cutoff = 1.32
       - CV^2 cutoff = 0.49
 
-    Quadrants:
+    Categories:
       - ADI < 1.32, CV^2 < 0.49  => smooth
       - ADI < 1.32, CV^2 >= 0.49 => erratic
-      - ADI >= 1.32, CV^2 < 0.49 => intermittent
-      - ADI >= 1.32, CV^2 >= 0.49 => lumpy
+      - ADI >= 1.32              => intermittent
     """
     y_arr = np.asarray(y, dtype=float)
     n = len(y_arr)
@@ -45,6 +44,6 @@ def classify_demand(y: np.ndarray) -> tuple[DemandClass, float, float]:
     if adi < ADI_CUTOFF:
         demand_class: DemandClass = "smooth" if cv2 < CV2_CUTOFF else "erratic"
     else:
-        demand_class = "intermittent" if cv2 < CV2_CUTOFF else "lumpy"
+        demand_class = "intermittent"
 
     return demand_class, round(adi, 4), round(cv2, 4)

@@ -16,11 +16,6 @@ export function getDemandClassBadge(demandClass) {
         label: "Intermittent",
         className: "bg-blue-500/10 text-blue-400 border border-blue-500/20",
       };
-    case "lumpy":
-      return {
-        label: "Lumpy",
-        className: "bg-rose-500/10 text-rose-400 border border-rose-500/20",
-      };
     default:
       return {
         label: demandClass || "Unknown",
